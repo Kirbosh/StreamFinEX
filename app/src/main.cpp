@@ -129,8 +129,8 @@ int main(int argc, char* argv[]) {
             {"resolution", fmt::format("{}x{}", brls::Application::windowWidth, brls::Application::windowHeight)},
         })
 
-    std::string v = conf.getItem(AppConfig::APP_UPDATE, std::string("NaN"));
-    if (AppVersion::getVersion().compare(v)) AppVersion::checkUpdate();
+    // No startup update check — the inherited updater targeted upstream
+    // Switchfin releases (see AppVersion::checkUpdate).
 
     // Run the app
     while (brls::Application::mainLoop());

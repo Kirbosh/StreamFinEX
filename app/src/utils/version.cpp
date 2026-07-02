@@ -115,62 +115,9 @@ std::string AppVersion::getDeviceName() {
 bool AppVersion::needUpdate(std::string latestVersion) { return false; }
 
 void AppVersion::checkUpdate(int delay, bool showUpToDateDialog) {
-    if (!AppVersion::updating->load()) {
-        Dialog::cancelable("main/setting/others/updating"_i18n, [] { AppVersion::updating->store(true); });
-        return;
-    }
-    ThreadPool::instance().submit([showUpToDateDialog](HTTP& s) {
-        try {
-            std::string url = fmt::format("https://api.github.com/repos/{}/releases/latest", git_repo);
-            auto resp = HTTP::get(url, HTTP::Timeout{});
-            nlohmann::json j = nlohmann::json::parse(resp);
-            std::string latest_ver = j.at("tag_name").get<std::string>();
-            if (latest_ver.compare(getVersion()) <= 0) {
-                brls::Logger::info("App is up to date");
-                if (showUpToDateDialog) brls::sync([]() { Dialog::show("main/setting/others/up2date"_i18n); });
-                return;
-            }
-
-            brls::sync([latest_ver]() {
-                std::string title = brls::getStr("main/setting/others/upgrade", latest_ver);
-                auto dialog = new brls::Dialog(title);
-                dialog->addButton("hints/cancel"_i18n, []() {
-                    auto& conf = AppConfig::instance();
-                    conf.setItem(AppConfig::APP_UPDATE, getVersion());
-                });
-#ifdef __SWITCH__
-                dialog->addButton("hints/ok"_i18n, [latest_ver]() {
-                    AppVersion::updating->store(false);
-                    ThreadPool::instance().submit([latest_ver](HTTP& s) {
-                        std::string conf_dir = AppConfig::instance().configDir();
-                        std::string pkg_name = AppVersion::getPackageName();
-                        std::string path = fmt::format("{}/{}_{}.nro", conf_dir, pkg_name, latest_ver);
-                        std::string url = fmt::format(
-                            "https://github.com/{}/releases/download/{}/{}.nro", git_repo, latest_ver, pkg_name);
-                        try {
-                            HTTP::download(url, path, HTTP::Timeout{-1}, AppVersion::updating);
-                            romfsExit();
-
-                            std::string target = fmt::format("{}/{}.nro", conf_dir, pkg_name);
-                            std::filesystem::remove(target);
-                            std::filesystem::rename(path, target);
-                            Dialog::quitApp(true);
-                        } catch (const std::exception& ex) {
-                            std::filesystem::remove(path);
-                            AppVersion::updating->store(true);
-                            std::string msg = fmt::format("{}: {}", path, ex.what());
-                            brls::sync([msg]() { Dialog::show(msg); });
-                        }
-                    });
-                });
-#else
-                std::string url = fmt::format("https://github.com/{}/releases/tag/{}", git_repo, latest_ver);
-                dialog->addButton("hints/ok"_i18n, [url] { brls::Application::getPlatform()->openBrowser(url); });
-#endif
-                dialog->open();
-            });
-        } catch (const std::exception& ex) {
-            brls::Logger::error("checkUpdate failed: {}", ex.what());
-        }
-    });
+    // In-app auto-update is disabled in this fork: the inherited updater
+    // pointed at upstream Switchfin's releases (wrong version scheme and a
+    // 404 download for this app). New builds come from
+    // https://github.com/scamNscoot/StreamFin/releases instead.
+    if (showUpToDateDialog) brls::sync([]() { Dialog::show("main/setting/others/up2date"_i18n); });
 }
