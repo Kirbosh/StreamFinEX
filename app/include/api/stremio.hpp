@@ -105,6 +105,30 @@ inline void saveAddon(const std::string& configDir, const std::string& url) {
     }
 }
 
+// Easier setup than typing a long URL on the on-screen keyboard: the user can
+// drop a plain-text file containing just the addon URL onto the SD card (from
+// the same PC session used to install the .nro). Checked at every launch;
+// when found it overrides and persists, then the file keeps working as the
+// way to update the URL too.
+inline void importAddonFromFile(const std::string& configDir) {
+    const std::string candidates[] = {
+        "sdmc:/switch/streamfin-addon.txt",   // next to where the .nro lives
+        configDir + "/addon.txt",             // alongside the app's other config
+    };
+    for (auto& path : candidates) {
+        std::ifstream in(path);
+        if (!in.is_open()) continue;
+        std::string line;
+        std::getline(in, line);
+        std::string url = normalizeAddonUrl(line);
+        if (!url.empty() && url != STREAM_ADDON) {
+            saveAddon(configDir, url);
+            brls::Logger::info("stream addon imported from {}", path);
+        }
+        return;  // first file found wins, valid or not
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Generic async JSON GET (runs off the UI thread, calls back on it)
 // ---------------------------------------------------------------------------

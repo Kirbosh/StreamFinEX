@@ -67,8 +67,11 @@ int main(int argc, char* argv[]) {
     if (!conf.init()) {
         return 0;
     }
-    // Load the user's stream addon URL (set on first launch via the UI).
+    // Load the user's stream addon URL (set on first launch via the UI), then
+    // let a streamfin-addon.txt dropped on the SD card set/override it — much
+    // easier than typing a long URL on the on-screen keyboard.
     stremio::loadAddon(conf.configDir());
+    stremio::importAddonFromFile(conf.configDir());
 
     // Init the app and i18n
     if (!brls::Application::init()) {

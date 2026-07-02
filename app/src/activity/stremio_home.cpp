@@ -39,7 +39,9 @@ void promptForAddon(const std::string& initial) {
             stremio::saveAddon(AppConfig::instance().configDir(), url);
             brls::Application::notify("Stream addon saved");
         },
-        "Stream addon URL", "Paste your Stremio stream addon URL (with or without /manifest.json)", 1024, initial, 0);
+        "Stream addon URL",
+        "Type your addon URL — or easier: put it in a text file at switch/streamfin-addon.txt on the SD card and relaunch",
+        1024, initial, 0);
 }
 
 // Consistent, polished styling for every row title (Continue Watching,

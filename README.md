@@ -33,12 +33,16 @@ addon URL**, which the app asks for on first launch.
 
 ## Setup
 
-1. Copy `StreamFin.nro` to `/switch/` on your SD card and launch it (full application mode
-   recommended — use a forwarder or title takeover).
-2. On first launch you'll be asked for your **stream addon URL** — the base URL of any Stremio
-   addon that implements the `stream` resource (paste it with or without `/manifest.json`).
-3. Change it any time by pressing **−** on the home screen. It's stored at
-   `sdmc:/config/StreamFin/stremio_addon.json`.
+1. Copy `StreamFin.nro` to `/switch/` on your SD card.
+2. **Recommended:** while the SD card is still in your PC, create a plain-text file at
+   `/switch/streamfin-addon.txt` containing just your **stream addon URL** — the base URL of any
+   Stremio addon that implements the `stream` resource (with or without `/manifest.json`, one
+   line). StreamFin imports it automatically at launch — no typing on the console. Editing the
+   file later updates the URL too.
+3. Alternatively, launch without the file and type the URL into the on-screen keyboard when
+   prompted (works, but long addon URLs are painful to type).
+4. Change it any time by pressing **−** on the home screen, or by editing the text file. The
+   active URL is stored at `sdmc:/config/StreamFin/stremio_addon.json`.
 
 Catalog browsing works without an addon; you only need one to actually play streams.
 
