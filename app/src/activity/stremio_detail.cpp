@@ -61,7 +61,8 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     // this on the download path, not on a cache hit, so set it explicitly.
     this->poster->setFreeTexture(false);
     row->addView(this->poster);
-    if (!item.poster.empty()) Image::with(this->poster, item.poster);
+    std::string posterSrc = stremio::posterUrl(item.id, item.poster);
+    if (!posterSrc.empty()) Image::with(this->poster, posterSrc);
 
     // ---- Info column (right) ----------------------------------------------
     auto* info = new brls::Box();

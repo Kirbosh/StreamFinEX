@@ -66,12 +66,23 @@ inline const std::string CINEMETA = "https://v3-cinemeta.strem.io";
 // directory. Empty until the user provides one (catalog browsing still works).
 inline std::string STREAM_ADDON;
 
-// Normalize a pasted addon URL: trim whitespace/quotes, drop a trailing
-// "/manifest.json" and trailing slashes. Returns empty if it isn't http(s).
-inline std::string normalizeAddonUrl(std::string s) {
+// Optional poster provider: a URL template with an {imdbId} placeholder,
+// e.g. RPDB's rating-embedded posters. When set, all poster images load from
+// it (and the text ★ badge is hidden — the rating is baked into the image).
+// Configured via streamfin-addon.txt lines "rpdb=KEY" or "poster=TEMPLATE".
+inline std::string POSTER_TEMPLATE;
+
+inline std::string trimJunk(std::string s) {
     auto junk = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '"' || c == '\''; };
     while (!s.empty() && junk(s.front())) s.erase(s.begin());
     while (!s.empty() && junk(s.back())) s.pop_back();
+    return s;
+}
+
+// Normalize a pasted addon URL: trim whitespace/quotes, drop a trailing
+// "/manifest.json" and trailing slashes. Returns empty if it isn't http(s).
+inline std::string normalizeAddonUrl(std::string s) {
+    s = trimJunk(s);
     const std::string suffix = "/manifest.json";
     if (s.size() > suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0)
         s.resize(s.size() - suffix.size());
@@ -80,7 +91,44 @@ inline std::string normalizeAddonUrl(std::string s) {
     return s;
 }
 
+// A poster template must be http(s) and contain the {imdbId} placeholder.
+inline std::string normalizePosterTemplate(std::string s) {
+    s = trimJunk(s);
+    if (s.rfind("http://", 0) != 0 && s.rfind("https://", 0) != 0) return std::string();
+    if (s.find("{imdbId}") == std::string::npos) return std::string();
+    return s;
+}
+
+// RatingPosterDB shorthand: "rpdb=KEY" expands to their rated-poster URL.
+// ?fallback=true keeps unrated titles showing a normal poster.
+inline std::string rpdbTemplate(const std::string& key) {
+    return "https://api.ratingposterdb.com/" + key + "/imdb/poster-default/{imdbId}.jpg?fallback=true";
+}
+
+// Poster for a title: the provider template when configured (IMDb ids only),
+// otherwise whatever poster the catalog gave us. Strips ":season:episode" so
+// series ids resolve to the series poster.
+inline std::string posterUrl(const std::string& id, const std::string& fallback) {
+    if (!POSTER_TEMPLATE.empty() && id.rfind("tt", 0) == 0) {
+        std::string tt = id.substr(0, id.find(':'));
+        std::string url = POSTER_TEMPLATE;
+        url.replace(url.find("{imdbId}"), 8, tt);
+        return url;
+    }
+    return fallback;
+}
+
 inline std::string addonConfigPath(const std::string& configDir) { return configDir + "/stremio_addon.json"; }
+
+inline void saveConfig(const std::string& configDir) {
+    ::mkdir(configDir.c_str(), 0777);
+    try {
+        std::ofstream out(addonConfigPath(configDir));
+        if (out.is_open()) out << nlohmann::json{{"url", STREAM_ADDON}, {"poster", POSTER_TEMPLATE}}.dump(2);
+    } catch (const std::exception& e) {
+        brls::Logger::warning("saveConfig: {}", e.what());
+    }
+}
 
 inline void loadAddon(const std::string& configDir) {
     try {
@@ -89,6 +137,7 @@ inline void loadAddon(const std::string& configDir) {
         nlohmann::json j;
         in >> j;
         STREAM_ADDON = normalizeAddonUrl(jstr(j, "url"));
+        POSTER_TEMPLATE = normalizePosterTemplate(jstr(j, "poster"));
     } catch (const std::exception& e) {
         brls::Logger::warning("loadAddon: {}", e.what());
     }
@@ -96,20 +145,16 @@ inline void loadAddon(const std::string& configDir) {
 
 inline void saveAddon(const std::string& configDir, const std::string& url) {
     STREAM_ADDON = normalizeAddonUrl(url);
-    ::mkdir(configDir.c_str(), 0777);
-    try {
-        std::ofstream out(addonConfigPath(configDir));
-        if (out.is_open()) out << nlohmann::json{{"url", STREAM_ADDON}}.dump(2);
-    } catch (const std::exception& e) {
-        brls::Logger::warning("saveAddon: {}", e.what());
-    }
+    saveConfig(configDir);
 }
 
-// Easier setup than typing a long URL on the on-screen keyboard: the user can
-// drop a plain-text file containing just the addon URL onto the SD card (from
-// the same PC session used to install the .nro). Checked at every launch;
-// when found it overrides and persists, then the file keeps working as the
-// way to update the URL too.
+// Easier setup than typing on the on-screen keyboard: the user drops a
+// plain-text file on the SD card. Line format (any order, all optional):
+//   https://your-stream-addon...      the stream addon base URL
+//   rpdb=YOUR_KEY                     rated posters via RatingPosterDB
+//   poster=https://...{imdbId}...     any custom poster provider template
+// Checked at every launch; when the file exists it is the source of truth
+// and is persisted, so editing it is also how you change settings later.
 inline void importAddonFromFile(const std::string& configDir) {
     const std::string candidates[] = {
         "sdmc:/switch/streamfin-addon.txt",   // next to where the .nro lives
@@ -118,14 +163,32 @@ inline void importAddonFromFile(const std::string& configDir) {
     for (auto& path : candidates) {
         std::ifstream in(path);
         if (!in.is_open()) continue;
-        std::string line;
-        std::getline(in, line);
-        std::string url = normalizeAddonUrl(line);
-        if (!url.empty() && url != STREAM_ADDON) {
-            saveAddon(configDir, url);
-            brls::Logger::info("stream addon imported from {}", path);
+
+        std::string url, poster, line;
+        while (std::getline(in, line)) {
+            line = trimJunk(line);
+            if (line.rfind("poster=", 0) == 0) {
+                poster = normalizePosterTemplate(line.substr(7));
+            } else if (line.rfind("rpdb=", 0) == 0) {
+                std::string key = trimJunk(line.substr(5));
+                if (!key.empty()) poster = rpdbTemplate(key);
+            } else if (!line.empty() && line[0] != '#') {
+                std::string u = normalizeAddonUrl(line);
+                if (!u.empty()) url = u;
+            }
         }
-        return;  // first file found wins, valid or not
+
+        // The file is the source of truth: apply both values (an absent
+        // rpdb/poster line turns the poster provider off again). A missing
+        // addon line never wipes a working addon URL.
+        std::string effectiveUrl = url.empty() ? STREAM_ADDON : url;
+        if (effectiveUrl != STREAM_ADDON || poster != POSTER_TEMPLATE) {
+            STREAM_ADDON = effectiveUrl;
+            POSTER_TEMPLATE = poster;
+            saveConfig(configDir);
+            brls::Logger::info("settings imported from {}", path);
+        }
+        return;  // first file found wins
     }
 }
 

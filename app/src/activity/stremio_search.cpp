@@ -50,8 +50,9 @@ public:
             cell->labelExt->setText(item.year);
             cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
         }
-        // IMDb rating badge, straight from the Cinemeta catalog data.
-        if (item.imdbRating.empty()) {
+        // IMDb rating badge, straight from the Cinemeta catalog data. Hidden
+        // when a poster provider is set (rating is baked into the image).
+        if (item.imdbRating.empty() || !stremio::POSTER_TEMPLATE.empty()) {
             cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
         } else {
             cell->labelRating->setText("★ " + item.imdbRating);
@@ -68,7 +69,8 @@ public:
             brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
         };
 
-        if (!item.poster.empty()) Image::with(cell->picture, item.poster);
+        std::string poster = stremio::posterUrl(item.id, item.poster);
+        if (!poster.empty()) Image::with(cell->picture, poster);
 
         return cell;
     }

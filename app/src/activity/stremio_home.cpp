@@ -75,8 +75,9 @@ public:
             cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
         }
         // IMDb rating badge (bottom-right on the poster), straight from the
-        // Cinemeta catalog data — no extra request.
-        if (item.imdbRating.empty()) {
+        // Cinemeta catalog data — no extra request. Hidden when a poster
+        // provider (RPDB etc.) is set: those bake the rating into the image.
+        if (item.imdbRating.empty() || !stremio::POSTER_TEMPLATE.empty()) {
             cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
         } else {
             cell->labelRating->setText("★ " + item.imdbRating);
@@ -94,7 +95,8 @@ public:
             brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
         };
 
-        if (!item.poster.empty()) Image::with(cell->picture, item.poster);
+        std::string poster = stremio::posterUrl(item.id, item.poster);
+        if (!poster.empty()) Image::with(cell->picture, poster);
 
         return cell;
     }
@@ -145,7 +147,10 @@ public:
             cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
         }
 
-        if (!e.poster.empty()) Image::with(cell->picture, e.poster);
+        // posterUrl strips ":season:episode", so with a poster provider set,
+        // series resolve to the SERIES poster instead of an episode thumb.
+        std::string poster = stremio::posterUrl(e.streamId, e.poster);
+        if (!poster.empty()) Image::with(cell->picture, poster);
 
         return cell;
     }

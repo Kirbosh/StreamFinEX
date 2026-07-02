@@ -35,16 +35,35 @@ addon URL**, which the app asks for on first launch.
 
 1. Copy `StreamFin.nro` to `/switch/` on your SD card.
 2. **Recommended:** while the SD card is still in your PC, create a plain-text file at
-   `/switch/streamfin-addon.txt` containing just your **stream addon URL** — the base URL of any
-   Stremio addon that implements the `stream` resource (with or without `/manifest.json`, one
-   line). StreamFin imports it automatically at launch — no typing on the console. Editing the
-   file later updates the URL too.
+   `/switch/streamfin-addon.txt` containing your **stream addon URL** — the base URL of any
+   Stremio addon that implements the `stream` resource (with or without `/manifest.json`).
+   StreamFin imports it automatically at launch — no typing on the console. Editing the file
+   later updates the settings too. Full format (all lines optional, `#` for comments):
+
+   ```
+   https://your-stream-addon.example.com/...
+   rpdb=YOUR_RPDB_KEY
+   ```
 3. Alternatively, launch without the file and type the URL into the on-screen keyboard when
    prompted (works, but long addon URLs are painful to type).
 4. Change it any time by pressing **−** on the home screen, or by editing the text file. The
    active URL is stored at `sdmc:/config/StreamFin/stremio_addon.json`.
 
 Catalog browsing works without an addon; you only need one to actually play streams.
+
+### Poster ratings (optional)
+
+Out of the box, every poster shows a small **★ IMDb badge** using data already present in the
+Cinemeta catalogs — no key needed. If you prefer posters with the rating **baked into the
+artwork**, add a poster provider to `streamfin-addon.txt`:
+
+- `rpdb=YOUR_KEY` — [RatingPosterDB](https://ratingposterdb.com) rated posters (free personal
+  key available; paid tiers add more rating sources).
+- `poster=https://.../{imdbId}/...` — any provider that serves poster images by IMDb id;
+  `{imdbId}` is replaced with the title's id (e.g. `tt1375666`).
+
+When a poster provider is set, the text badge is hidden automatically (the rating is in the
+image). Remove the line to switch back.
 
 ## Controls
 
