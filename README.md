@@ -1,4 +1,4 @@
-# Switch Stremio
+# StreamFin
 
 A **streaming-only Stremio client for homebrewed Nintendo Switch**, built by forking
 [Switchfin](https://github.com/dragonflylee/switchfin) and replacing its Jellyfin data layer with
@@ -21,12 +21,12 @@ addon URL**, which the app asks for on first launch.
 
 ## Setup
 
-1. Copy `Switchfin.nro` to `/switch/` on your SD card and launch it (full application mode
+1. Copy `StreamFin.nro` to `/switch/` on your SD card and launch it (full application mode
    recommended — use a forwarder or title takeover).
 2. On first launch you'll be asked for your **stream addon URL** — the base URL of any Stremio
    addon that implements the `stream` resource (paste it with or without `/manifest.json`).
 3. Change it any time by pressing **−** on the home screen. It's stored at
-   `sdmc:/config/Switchfin/stremio_addon.json`.
+   `sdmc:/config/StreamFin/stremio_addon.json`.
 
 Catalog browsing works without an addon; you only need one to actually play streams.
 
@@ -53,7 +53,7 @@ Requires [devkitPro](https://devkitpro.org/) with devkitA64/libnx and Switchfin'
 export PKG_CONFIG_LIBDIR=/opt/devkitpro/portlibs/switch/lib/pkgconfig
 export PKG_CONFIG_PATH=/opt/devkitpro/portlibs/switch/lib/pkgconfig
 cmake -B build_switch -G Ninja -DPLATFORM_SWITCH=ON -DBUILTIN_NSP=OFF
-ninja -C build_switch Switchfin.nro
+ninja -C build_switch StreamFin.nro
 ```
 
 ## Credits
