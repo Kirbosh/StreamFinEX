@@ -50,7 +50,13 @@ public:
             cell->labelExt->setText(item.year);
             cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
         }
-        cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+        // IMDb rating badge, straight from the Cinemeta catalog data.
+        if (item.imdbRating.empty()) {
+            cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+        } else {
+            cell->labelRating->setText("★ " + item.imdbRating);
+            cell->labelRating->setVisibility(brls::Visibility::VISIBLE);
+        }
         cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
         cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
 

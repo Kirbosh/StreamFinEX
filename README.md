@@ -23,7 +23,7 @@ addon URL**, which the app asks for on first launch.
 ## Features
 
 - **Home screen** — poster carousels: Popular / New / Top Rated / Animation / Documentary,
-  movies & series (Cinemeta)
+  movies & series (Cinemeta), with **IMDb rating badges** on every poster
 - **Title details** — poster, year, runtime, IMDb rating, genres, description, cast, director
 - **Series support** — seasons → episodes with air dates → stream picker
 - **Search** (press Y) via the on-screen keyboard

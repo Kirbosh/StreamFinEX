@@ -166,7 +166,8 @@ struct Meta {
     std::string type;  // "movie" | "series"
     std::string name;
     std::string poster;
-    std::string year;  // release year, e.g. "2010" (series may be "2010-2019")
+    std::string year;        // release year, e.g. "2010" (series may be "2010-2019")
+    std::string imdbRating;  // e.g. "7.5"; Cinemeta sends it in every catalog item
 };
 inline void from_json(const nlohmann::json& j, Meta& m) {
     m.id = jstr(j, "id");
@@ -174,9 +175,11 @@ inline void from_json(const nlohmann::json& j, Meta& m) {
     m.name = jstr(j, "name");
     m.poster = jstr(j, "poster");
     m.year = jstr(j, "year");
+    m.imdbRating = jstr(j, "imdbRating");
 }
 inline void to_json(nlohmann::json& j, const Meta& m) {
-    j = nlohmann::json{{"id", m.id}, {"type", m.type}, {"name", m.name}, {"poster", m.poster}, {"year", m.year}};
+    j = nlohmann::json{{"id", m.id}, {"type", m.type}, {"name", m.name}, {"poster", m.poster}, {"year", m.year},
+        {"imdbRating", m.imdbRating}};
 }
 
 // Response of /catalog/{type}/{id}.json
