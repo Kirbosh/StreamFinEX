@@ -116,8 +116,10 @@ public:
 
     inline static bool DEBUG = false;
 
-    // Bottom progress bar
-    inline static bool BOTTOM_BAR = true;
+    // Progress line at the very bottom of the screen while the OSD is hidden.
+    // Off by default (a stray blue line during playback reads as a glitch);
+    // toggle lives in the player's + settings menu.
+    inline static bool BOTTOM_BAR = false;
     inline static bool OSD_ON_TOGGLE = true;
     // 是否开启 TV 客户端的控制逻辑
     inline static bool OSD_TV_MODE = false;

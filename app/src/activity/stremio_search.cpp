@@ -97,8 +97,14 @@ StremioSearch::StremioSearch(const std::string& query) {
     this->setBackgroundColor(brls::Application::getTheme()["brls/background"]);
     this->setPadding(20, 40, 20, 40);
 
-    auto* header = new brls::Header();
-    header->setTitle(fmt::format("Search: {}", query));
+    // Plain label, styled like the home-row titles. (brls::Header draws a
+    // full-width underline that looked like a stray line above the posters.)
+    auto* header = new brls::Label();
+    header->setText(fmt::format("Search: {}", query));
+    header->setFontSize(27);
+    header->setMarginBottom(14);
+    header->setMarginLeft(6);
+    header->setTextColor(nvgRGB(240, 242, 248));
     this->addView(header);
 
     this->recycler = new RecyclingGrid();

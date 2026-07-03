@@ -4,6 +4,9 @@
 #include "view/mpv_core.hpp"
 #include "view/player_setting.hpp"
 
+#include <algorithm>
+#include <unordered_map>
+
 using namespace brls::literals;
 
 PlayerSetting::PlayerSetting(const jellyfin::Source* src) {
@@ -32,16 +35,52 @@ PlayerSetting::PlayerSetting(const jellyfin::Source* src) {
     std::vector<std::string> subSource = {"main/player/none"_i18n};
     std::vector<int> subStream = {0};
 
+    // Human-readable name for an ISO-639 language code (mkv/mp4 audio tracks
+    // usually carry "eng"/"jpn"-style codes). Unknown codes pass through.
+    auto langName = [](const std::string& code) -> std::string {
+        static const std::unordered_map<std::string, std::string> names = {
+            {"eng", "English"}, {"en", "English"}, {"jpn", "Japanese"}, {"ja", "Japanese"},
+            {"spa", "Spanish"}, {"es", "Spanish"}, {"fre", "French"}, {"fra", "French"}, {"fr", "French"},
+            {"ger", "German"}, {"deu", "German"}, {"de", "German"}, {"ita", "Italian"}, {"it", "Italian"},
+            {"por", "Portuguese"}, {"pt", "Portuguese"}, {"rus", "Russian"}, {"ru", "Russian"},
+            {"kor", "Korean"}, {"ko", "Korean"}, {"chi", "Chinese"}, {"zho", "Chinese"}, {"zh", "Chinese"},
+            {"hin", "Hindi"}, {"hi", "Hindi"}, {"ara", "Arabic"}, {"ar", "Arabic"},
+            {"tur", "Turkish"}, {"pol", "Polish"}, {"dut", "Dutch"}, {"nld", "Dutch"},
+            {"swe", "Swedish"}, {"nor", "Norwegian"}, {"dan", "Danish"}, {"fin", "Finnish"},
+            {"cze", "Czech"}, {"ces", "Czech"}, {"gre", "Greek"}, {"ell", "Greek"},
+            {"heb", "Hebrew"}, {"tha", "Thai"}, {"vie", "Vietnamese"}, {"ind", "Indonesian"},
+            {"ukr", "Ukrainian"}, {"rum", "Romanian"}, {"ron", "Romanian"}, {"hun", "Hungarian"},
+            {"und", ""},  // "undetermined" — treat as no language info
+        };
+        auto it = names.find(code);
+        return it != names.end() ? it->second : code;
+    };
+    // Avoid identical entries (e.g. two tracks both titled "Stereo").
+    auto uniq = [](std::vector<std::string>& list, std::string label) {
+        int n = 2;
+        std::string out = label;
+        while (std::find(list.begin(), list.end(), out) != list.end()) out = fmt::format("{} ({})", label, n++);
+        return out;
+    };
+
     int64_t count = mpv.getInt("track-list/count");
     for (int64_t n = 0; n < count; n++) {
         std::string type = mpv.getString(fmt::format("track-list/{}/type", n));
         std::string title = mpv.getString(fmt::format("track-list/{}/title", n));
-        if (title.empty()) title = mpv.getString(fmt::format("track-list/{}/lang", n));
-        if (title.empty()) title = fmt::format("{} track {}", type, n);
-        if (type == "sub")
-            subTrack.push_back(title);
-        else if (type == "audio")
-            audioTrack.push_back(title);
+        std::string lang = langName(mpv.getString(fmt::format("track-list/{}/lang", n)));
+        if (type == "audio") {
+            // Language first — a title like "Stereo" alone is useless when a
+            // file has several audio tracks.
+            std::string label = lang;
+            if (!title.empty() && title != label) label = label.empty() ? title : (label + " · " + title);
+            if (label.empty()) label = fmt::format("Audio track {}", audioTrack.size() + 1);
+            audioTrack.push_back(uniq(audioTrack, label));
+        } else if (type == "sub") {
+            // Subtitle titles are usually descriptive ("English (SDH)").
+            std::string label = title.empty() ? lang : title;
+            if (label.empty()) label = fmt::format("Subtitle {}", subTrack.size());
+            subTrack.push_back(uniq(subTrack, label));
+        }
     }
 
     if (src != nullptr) {
@@ -115,7 +154,7 @@ PlayerSetting::PlayerSetting(const jellyfin::Source* src) {
 #endif
 
     btnBottomBar->init(
-        "main/setting/playback/bottom_bar"_i18n, conf.getItem(AppConfig::PLAYER_BOTTOM_BAR, true), [&conf](bool value) {
+        "main/setting/playback/bottom_bar"_i18n, conf.getItem(AppConfig::PLAYER_BOTTOM_BAR, false), [&conf](bool value) {
             MPVCore::BOTTOM_BAR = value;
             conf.setItem(AppConfig::PLAYER_BOTTOM_BAR, value);
         });
