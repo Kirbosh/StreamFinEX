@@ -159,6 +159,8 @@ void MPVCore::init() {
         brls::Logger::info("set memory cache: {}MB", MPVCore::INMEMORY_CACHE);
         mpv_set_option_string(mpv, "demuxer-max-bytes", fmt::format("{}MiB", MPVCore::INMEMORY_CACHE).c_str());
         mpv_set_option_string(mpv, "demuxer-max-back-bytes", fmt::format("{}MiB", MPVCore::INMEMORY_CACHE / 2).c_str());
+        // Larger network read chunks help throughput on Wi-Fi (default 128KB).
+        mpv_set_option_string(mpv, "stream-buffer-size", "1MiB");
     } else {
         mpv_set_option_string(mpv, "cache", "no");
     }

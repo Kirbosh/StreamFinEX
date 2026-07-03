@@ -16,11 +16,15 @@ class StremioSearch : public brls::Box {
 public:
     explicit StremioSearch(const std::string& query);
 
-    // Appends a batch of results to the grid (called from each search request).
-    void addResults(const std::vector<stremio::Meta>& metas);
+    // Stores one batch of results (movies or series) and rebuilds the grid.
+    void addResults(const std::vector<stremio::Meta>& metas, bool isSeries);
 
 private:
-    void fetchInto(const std::string& url);
+    void fetchInto(const std::string& url, bool isSeries);
+    void rebuild();  // interleave movies + series into the grid
+
+    std::vector<stremio::Meta> movies, series;
+    int pending = 2;  // outstanding search requests (movies + series)
 
     RecyclingGrid* recycler = nullptr;
 };

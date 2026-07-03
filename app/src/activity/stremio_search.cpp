@@ -13,29 +13,34 @@
 #include "utils/image.hpp"
 #include "api/stremio.hpp"
 
+#include <algorithm>
+
 using namespace brls::literals;
 
 namespace {
 
-// Minimal URL-encoding (spaces are the common case in search terms).
+// Percent-encode everything outside the unreserved set, so queries with
+// commas, ampersands, etc. ("love, death & robots") reach Cinemeta intact.
 std::string urlEncode(const std::string& s) {
+    static const char* hex = "0123456789ABCDEF";
     std::string out;
-    for (char c : s) {
-        if (c == ' ')
-            out += "%20";
-        else
-            out += c;
+    for (unsigned char c : s) {
+        if (isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+            out += (char)c;
+        } else {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
     }
     return out;
 }
 
-// Same behaviour as the home grid's source: movies open the picker, series
-// open the season list.
+// Same behaviour as the home grid's source: every result opens the detail
+// screen.
 class SearchSource : public RecyclingGridDataSource {
 public:
     explicit SearchSource(const std::vector<stremio::Meta>& r) : list(r) {}
-
-    void append(const std::vector<stremio::Meta>& r) { this->list.insert(this->list.end(), r.begin(), r.end()); }
 
     size_t getItemCount() override { return this->list.size(); }
 
@@ -125,35 +130,47 @@ StremioSearch::StremioSearch(const std::string& query) {
     brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 
     std::string q = urlEncode(query);
-    this->fetchInto(stremio::CINEMETA + "/catalog/movie/top/search=" + q + ".json");
-    this->fetchInto(stremio::CINEMETA + "/catalog/series/top/search=" + q + ".json");
+    this->fetchInto(stremio::CINEMETA + "/catalog/movie/top/search=" + q + ".json", false);
+    this->fetchInto(stremio::CINEMETA + "/catalog/series/top/search=" + q + ".json", true);
 }
 
-void StremioSearch::fetchInto(const std::string& url) {
+void StremioSearch::fetchInto(const std::string& url, bool isSeries) {
     ASYNC_RETAIN
     stremio::getJSON<stremio::MetaList>(
-        [ASYNC_TOKEN](stremio::MetaList r) {
+        [ASYNC_TOKEN, isSeries](stremio::MetaList r) {
             ASYNC_RELEASE
-            this->addResults(r.metas);
+            this->addResults(r.metas, isSeries);
         },
-        [ASYNC_TOKEN](const std::string& e) {
+        [ASYNC_TOKEN, isSeries](const std::string& e) {
             ASYNC_RELEASE
-            this->addResults({});  // let the empty-state logic run
+            this->addResults({}, isSeries);  // let the empty-state logic run
         },
         url);
 }
 
-void StremioSearch::addResults(const std::vector<stremio::Meta>& metas) {
-    auto* src = dynamic_cast<SearchSource*>(this->recycler->getDataSource());
-    if (metas.empty()) {
-        if (!src) this->recycler->setEmpty("No results", "icon/ico-search.svg");
+void StremioSearch::addResults(const std::vector<stremio::Meta>& metas, bool isSeries) {
+    (isSeries ? this->series : this->movies) = metas;
+    this->pending--;
+    this->rebuild();
+}
+
+// Interleave series and movies (each list is already relevance-ordered by
+// Cinemeta). Appending one list after the other buried every series result
+// under up to ~100 movies — "Love, Death & Robots" was unfindable.
+void StremioSearch::rebuild() {
+    std::vector<stremio::Meta> mixed;
+    mixed.reserve(this->movies.size() + this->series.size());
+    size_t n = std::max(this->movies.size(), this->series.size());
+    for (size_t i = 0; i < n; i++) {
+        if (i < this->series.size()) mixed.push_back(this->series[i]);
+        if (i < this->movies.size()) mixed.push_back(this->movies[i]);
+    }
+
+    if (mixed.empty()) {
+        if (this->pending <= 0) this->recycler->setEmpty("No results", "icon/ico-search.svg");
         return;
     }
-    if (src) {
-        src->append(metas);
-        this->recycler->notifyDataChanged();
-    } else {
-        this->recycler->setDataSource(new SearchSource(metas));
-        brls::Application::giveFocus(this->recycler);
-    }
+    bool firstResults = dynamic_cast<SearchSource*>(this->recycler->getDataSource()) == nullptr;
+    this->recycler->setDataSource(new SearchSource(mixed));
+    if (firstResults) brls::Application::giveFocus(this->recycler);
 }
