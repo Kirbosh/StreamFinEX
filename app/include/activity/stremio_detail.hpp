@@ -25,6 +25,7 @@ private:
 
     stremio::Meta item;   // catalog entry we were opened with
     std::vector<stremio::Video> videos;  // series episodes from the meta fetch
+    std::string background;              // series backdrop (episode-thumb fallback)
     bool fetching = false;  // a stream request is in flight (debounce Watch)
 
     brls::Image* poster = nullptr;

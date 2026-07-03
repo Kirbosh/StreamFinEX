@@ -191,8 +191,9 @@ void StremioDetail::applyMeta(const stremio::MetaDetail& meta) {
     }
 
     // Keep the episodes so the Episodes button can open the season list
-    // without refetching the meta.
+    // without refetching the meta, and the backdrop as episode-thumb fallback.
     this->videos = meta.videos;
+    this->background = meta.background;
 
     // Year · runtime · ★ rating (· N seasons for series)
     std::vector<std::string> parts;
@@ -234,7 +235,8 @@ void StremioDetail::onAction() {
         // constructor if the meta hasn't arrived (or failed).
         if (!this->videos.empty())
             brls::Application::pushActivity(
-                new brls::Activity(new StremioSeries(this->item.name, this->videos)), brls::TransitionAnimation::NONE);
+                new brls::Activity(new StremioSeries(this->item.name, this->videos, this->background)),
+                brls::TransitionAnimation::NONE);
         else
             brls::Application::pushActivity(
                 new brls::Activity(new StremioSeries(this->item)), brls::TransitionAnimation::NONE);

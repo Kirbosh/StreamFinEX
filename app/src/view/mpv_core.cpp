@@ -164,6 +164,12 @@ void MPVCore::init() {
     } else {
         mpv_set_option_string(mpv, "cache", "no");
     }
+    // Long-running HTTPS streams (big files) get their connection dropped or
+    // throttled mid-file by CDNs; without these flags ffmpeg's http reader
+    // stalls forever, which looks like endless buffering. Reconnect silently
+    // and give up on dead reads after 15s instead.
+    mpv_set_option_string(
+        mpv, "stream-lavf-o", "reconnect=1,reconnect_streamed=1,reconnect_delay_max=7,rw_timeout=15000000");
     // Making the loading process faster
 #if defined(__SWITCH__)
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");

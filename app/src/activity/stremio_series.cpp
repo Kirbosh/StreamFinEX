@@ -33,8 +33,8 @@ struct SeasonEntry {
 
 class SeasonSource : public RecyclingGridDataSource {
 public:
-    SeasonSource(std::string seriesName, std::vector<SeasonEntry> s)
-        : seriesName(std::move(seriesName)), list(std::move(s)) {}
+    SeasonSource(std::string seriesName, std::string background, std::vector<SeasonEntry> s)
+        : seriesName(std::move(seriesName)), background(std::move(background)), list(std::move(s)) {}
 
     size_t getItemCount() override { return this->list.size(); }
 
@@ -50,13 +50,14 @@ public:
     void onItemSelected(brls::Box* recycler, size_t index) override {
         auto& s = this->list.at(index);
         brls::Application::pushActivity(
-            new brls::Activity(new StremioSeason(this->seriesName, s.label, s.episodes)));
+            new brls::Activity(new StremioSeason(this->seriesName, s.label, s.episodes, this->background)));
     }
 
     void clearData() override { this->list.clear(); }
 
 private:
     std::string seriesName;
+    std::string background;
     std::vector<SeasonEntry> list;
 };
 
@@ -71,8 +72,8 @@ public:
 
 class EpisodeSource : public RecyclingGridDataSource {
 public:
-    EpisodeSource(std::string seriesName, const std::vector<stremio::Video>& v)
-        : seriesName(std::move(seriesName)), list(std::move(v)) {}
+    EpisodeSource(std::string seriesName, std::string background, const std::vector<stremio::Video>& v)
+        : seriesName(std::move(seriesName)), background(std::move(background)), list(std::move(v)) {}
 
     size_t getItemCount() override { return this->list.size(); }
 
@@ -89,7 +90,12 @@ public:
         cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
         cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
 
-        if (!v.thumbnail.empty()) Image::with(cell->picture, v.thumbnail);
+        // Newly-aired episodes often have no still yet (metahub 404s); fall
+        // back to the series backdrop instead of the grey placeholder.
+        if (!v.thumbnail.empty())
+            Image::with(cell->picture, v.thumbnail, this->background);
+        else if (!this->background.empty())
+            Image::with(cell->picture, this->background);
 
         return cell;
     }
@@ -124,6 +130,7 @@ public:
 
 private:
     std::string seriesName;
+    std::string background;
     std::vector<stremio::Video> list;
 };
 
@@ -152,7 +159,8 @@ void StremioSeries::init() {
     });
 }
 
-void StremioSeries::setSeasons(const std::string& name, const std::vector<stremio::Video>& videos) {
+void StremioSeries::setSeasons(
+    const std::string& name, const std::vector<stremio::Video>& videos, const std::string& background) {
     if (videos.empty()) {
         this->recycler->setError("No episodes found");
         return;
@@ -170,7 +178,7 @@ void StremioSeries::setSeasons(const std::string& name, const std::vector<stremi
         this->recycler->setError("No episodes found");
         return;
     }
-    this->recycler->setDataSource(new SeasonSource(name, std::move(seasons)));
+    this->recycler->setDataSource(new SeasonSource(name, background, std::move(seasons)));
     brls::Application::giveFocus(this->recycler);
 }
 
@@ -186,7 +194,7 @@ StremioSeries::StremioSeries(const stremio::Meta& series) {
             ASYNC_RELEASE
             // Prefer the (English) name from the meta response; fall back to the
             // catalog name we were opened with.
-            this->setSeasons(r.meta.name.empty() ? seriesName : r.meta.name, r.meta.videos);
+            this->setSeasons(r.meta.name.empty() ? seriesName : r.meta.name, r.meta.videos, r.meta.background);
         },
         [ASYNC_TOKEN](const std::string& e) {
             ASYNC_RELEASE
@@ -195,15 +203,16 @@ StremioSeries::StremioSeries(const stremio::Meta& series) {
         stremio::CINEMETA + "/meta/series/" + series.id + ".json");
 }
 
-StremioSeries::StremioSeries(const std::string& name, const std::vector<stremio::Video>& videos) {
+StremioSeries::StremioSeries(
+    const std::string& name, const std::vector<stremio::Video>& videos, const std::string& background) {
     brls::Logger::debug("StremioSeries: create from {} prefetched episodes", videos.size());
     this->init();
-    this->setSeasons(name, videos);
+    this->setSeasons(name, videos, background);
 }
 
 // ---- StremioSeason: lists episodes of one season -------------------------
-StremioSeason::StremioSeason(
-    const std::string& seriesName, const std::string& title, const std::vector<stremio::Video>& episodes) {
+StremioSeason::StremioSeason(const std::string& seriesName, const std::string& title,
+    const std::vector<stremio::Video>& episodes, const std::string& background) {
     brls::Logger::debug("StremioSeason: {} ({} eps)", title, episodes.size());
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
@@ -224,6 +233,6 @@ StremioSeason::StremioSeason(
         return true;
     });
 
-    this->recycler->setDataSource(new EpisodeSource(seriesName, episodes));
+    this->recycler->setDataSource(new EpisodeSource(seriesName, background, episodes));
     brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 }

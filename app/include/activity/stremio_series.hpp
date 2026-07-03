@@ -17,11 +17,13 @@ public:
     // Fetches the series meta from Cinemeta, then lists its seasons.
     explicit StremioSeries(const stremio::Meta& series);
     // Uses already-fetched episodes (e.g. from the detail screen) — no refetch.
-    StremioSeries(const std::string& name, const std::vector<stremio::Video>& videos);
+    // background: series backdrop, used when an episode thumbnail is missing.
+    StremioSeries(const std::string& name, const std::vector<stremio::Video>& videos, const std::string& background);
 
 private:
     void init();
-    void setSeasons(const std::string& name, const std::vector<stremio::Video>& videos);
+    void setSeasons(
+        const std::string& name, const std::vector<stremio::Video>& videos, const std::string& background);
 
     RecyclingGrid* recycler = nullptr;
 };
@@ -29,7 +31,7 @@ private:
 class StremioSeason : public brls::Box {
 public:
     StremioSeason(const std::string& seriesName, const std::string& title,
-        const std::vector<stremio::Video>& episodes);
+        const std::vector<stremio::Video>& episodes, const std::string& background);
 
 private:
     RecyclingGrid* recycler = nullptr;

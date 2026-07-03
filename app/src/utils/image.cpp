@@ -108,7 +108,7 @@ Image::Image() : image(nullptr) {
 
 Image::~Image() { brls::Logger::verbose("delete Image {}", fmt::ptr(this)); }
 
-void Image::with(brls::Image* view, const std::string& url) {
+void Image::with(brls::Image* view, const std::string& url, const std::string& fallback) {
     int tex = brls::TextureCache::instance().getCache(url);
     if (tex > 0) {
         view->innerSetImage(tex);
@@ -133,6 +133,7 @@ void Image::with(brls::Image* view, const std::string& url) {
 
     item->image = view;
     item->url = url;
+    item->fallbackUrl = fallback;
     item->isCancel->store(false);
     view->ptrLock();
     // 设置图片组件不处理纹理的销毁，由缓存统一管理纹理销毁
@@ -225,6 +226,14 @@ void Image::doRequest(HTTP& s) {
             }
         });
     } catch (const std::exception& ex) {
+        // Try the fallback URL once (e.g. episode thumbnails that 404 fall
+        // back to the series backdrop).
+        if (!this->fallbackUrl.empty() && !this->isCancel->load()) {
+            brls::Logger::verbose("image fallback {} -> {}", this->url, this->fallbackUrl);
+            this->url = this->fallbackUrl;
+            this->fallbackUrl.clear();
+            return this->doRequest(s);
+        }
         brls::Logger::warning("request image {} {}", this->url, ex.what());
         Image::clear(this->image);
     }

@@ -20,7 +20,8 @@ public:
     }
 
     /// @brief 设置要加载内容的图片组件。此函数需要工作在主线程。
-    static void with(brls::Image* view, const std::string& url);
+    /// fallback: optional second URL tried when the first one fails (404 etc.)
+    static void with(brls::Image* view, const std::string& url, const std::string& fallback = "");
 
     /// @brief 取消请求，并清空图片。此函数需要工作在主线程。
     static void cancel(brls::Image* view);
@@ -32,6 +33,7 @@ private:
 
 private:
     std::string url;
+    std::string fallbackUrl;  // tried once if the primary URL fails
     brls::Image* image;
     HTTP::Cancel isCancel;
 
