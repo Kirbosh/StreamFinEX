@@ -1,6 +1,7 @@
 #pragma once
 
 #include <borealis.hpp>
+#include <unordered_set>
 #include "api/http.hpp"
 #include "config.hpp"
 
@@ -36,6 +37,11 @@ private:
     std::string fallbackUrl;  // tried once if the primary URL fails
     brls::Image* image;
     HTTP::Cancel isCancel;
+
+    /// URLs that already failed once this session (404 etc.). Checked before
+    /// requesting, so recycled cells don't re-fetch dead thumbnails on every
+    /// scroll — they go straight to the fallback.
+    inline static std::unordered_set<std::string> failedUrls;
 
     /// 对象池
     inline static std::list<Ref> pool;

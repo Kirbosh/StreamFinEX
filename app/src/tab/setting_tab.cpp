@@ -145,7 +145,7 @@ void SettingTab::onCreate() {
 /// Hardware decode
 #ifdef __SWITCH__
     btnOverClock->init(
-        "main/setting/others/overclock"_i18n, conf.getItem(AppConfig::OVERCLOCK, false), [&conf](bool value) {
+        "main/setting/others/overclock"_i18n, conf.getItem(AppConfig::OVERCLOCK, true), [&conf](bool value) {
             SwitchSys::setClock(value);
             conf.setItem(AppConfig::OVERCLOCK, value);
         });

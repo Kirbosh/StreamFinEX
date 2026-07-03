@@ -115,6 +115,19 @@ void Image::with(brls::Image* view, const std::string& url, const std::string& f
         return;
     }
 
+    // Known-dead URL (e.g. missing episode still): don't re-request it on
+    // every cell recycle — go straight to the fallback (usually already in
+    // the texture cache, so this is instant and flicker-free).
+    bool primaryDead = false;
+    {
+        std::lock_guard<std::mutex> lock(requestMutex);
+        primaryDead = failedUrls.count(url) > 0;
+    }
+    if (primaryDead) {
+        if (!fallback.empty()) Image::with(view, fallback);
+        return;
+    }
+
     Ref item;
     std::lock_guard<std::mutex> lock(requestMutex);
 
@@ -226,6 +239,11 @@ void Image::doRequest(HTTP& s) {
             }
         });
     } catch (const std::exception& ex) {
+        // Remember the failure so recycled cells skip this URL from now on.
+        {
+            std::lock_guard<std::mutex> lock(requestMutex);
+            failedUrls.insert(this->url);
+        }
         // Try the fallback URL once (e.g. episode thumbnails that 404 fall
         // back to the series backdrop).
         if (!this->fallbackUrl.empty() && !this->isCancel->load()) {

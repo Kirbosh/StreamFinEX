@@ -453,8 +453,10 @@ bool AppConfig::init() {
     });
 
 #ifdef __SWITCH__
-    /// Set Overclock
-    if (getItem(AppConfig::OVERCLOCK, false)) {
+    /// Set Overclock. Default ON: HTTPS throughput on the Switch is CPU-bound
+    /// (TLS decryption), and the stock clock caps streaming around ~1 MB/s —
+    /// too slow for high-bitrate files. Toggle lives in Settings.
+    if (getItem(AppConfig::OVERCLOCK, true)) {
         SwitchSys::setClock(true);
     };
 #endif
