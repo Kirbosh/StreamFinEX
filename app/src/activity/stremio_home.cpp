@@ -307,6 +307,8 @@ void StremioHome::refreshFavourites() {
         this->favRec->setDataSource(new StremioSource(favs));
         if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
     }
+    // Force a clean relayout (see refreshContinue for why).
+    this->boxHome->invalidate();
 }
 
 void StremioHome::addContinueRow() {
@@ -350,6 +352,10 @@ void StremioHome::refreshContinue() {
         if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
         this->enrichContinue();  // resolve any non-English / stale titles, then rebuild once
     }
+    // Force a clean relayout of the whole column: a row toggling between
+    // hidden and visible mid-frame left everything below it with a doubled
+    // left padding (the "band on the left side" bug).
+    this->boxHome->invalidate();
 }
 
 // Resolve English titles (and series "Name · S1E5") from Cinemeta for any
