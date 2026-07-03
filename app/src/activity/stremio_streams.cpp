@@ -18,6 +18,80 @@ using namespace brls::literals;
 
 namespace {
 
+// Fetches subtitles from the configured subtitles addon (SubSource etc.) for
+// the title being played and attaches them to MPV once the file is loaded.
+// They then appear in the player's + menu Subtitle picker alongside any
+// embedded tracks.
+class SubLoader {
+public:
+    static SubLoader& instance() {
+        static SubLoader inst;
+        return inst;
+    }
+
+    // Call right before starting playback of {type, id}.
+    void prepare(const std::string& type, const std::string& id) {
+        this->init();
+        this->pending.clear();
+        this->fileLoaded = false;
+        if (stremio::SUBTITLES_ADDON.empty()) return;
+
+        int ticket = ++this->requestTicket;
+        std::string url = stremio::SUBTITLES_ADDON + "/subtitles/" + type + "/" + id + ".json";
+        stremio::getJSON<stremio::SubtitleList>(
+            [this, ticket](stremio::SubtitleList r) {
+                if (ticket != this->requestTicket) return;  // a newer title started
+                // Keep the first subtitle per language, capped, so the picker
+                // stays usable (addons can return dozens per release).
+                std::vector<std::string> seen;
+                for (auto& s : r.subtitles) {
+                    if (this->pending.size() >= 12) break;
+                    if (std::find(seen.begin(), seen.end(), s.lang) != seen.end()) continue;
+                    seen.push_back(s.lang);
+                    this->pending.push_back(s);
+                }
+                if (this->fileLoaded) this->attach();
+            },
+            [](const std::string& e) { brls::Logger::warning("subtitles addon: {}", e); }, url);
+    }
+
+private:
+    void init() {
+        if (this->inited) return;
+        this->inited = true;
+        MPVCore::instance().getEvent()->subscribe([this](MpvEventEnum e) {
+            switch (e) {
+            case MpvEventEnum::MPV_LOADED:
+                this->fileLoaded = true;
+                this->attach();
+                break;
+            case MpvEventEnum::MPV_STOP:
+            case MpvEventEnum::END_OF_FILE:
+                this->fileLoaded = false;
+                this->pending.clear();
+                break;
+            default:
+                break;
+            }
+        });
+    }
+
+    void attach() {
+        auto& mpv = MPVCore::instance();
+        for (auto& s : this->pending) {
+            std::string title = s.lang.empty() ? "External" : s.lang;
+            // "auto" = add without selecting; the user picks via the + menu.
+            mpv.command("sub-add", s.url.c_str(), "auto", title.c_str(), s.lang.c_str());
+        }
+        this->pending.clear();
+    }
+
+    bool inited = false;
+    bool fileLoaded = false;
+    int requestTicket = 0;
+    std::vector<stremio::Subtitle> pending;
+};
+
 // Clean text row built in code: name on top, full description below.
 class StreamCell : public RecyclingGridItem {
 public:
@@ -69,6 +143,8 @@ public:
         }
         // Remember what we're playing so the tracker can resume/record by id.
         ResumeTracker::instance().setCurrent(this->key);
+        // Ask the subtitles addon (if configured) for subs for this title.
+        SubLoader::instance().prepare(this->key.streamType, this->key.streamId);
         // Prefer English audio tracks for this (and subsequent) playback.
         MPVCore::instance().command("set", "alang", "eng,en");
         // Show the media title (movie name / "Series · S1E5 · Episode") on the

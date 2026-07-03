@@ -72,6 +72,12 @@ inline std::string STREAM_ADDON;
 // Configured via streamfin-addon.txt lines "rpdb=KEY" or "poster=TEMPLATE".
 inline std::string POSTER_TEMPLATE;
 
+// Optional subtitles addon (SubSource, OpenSubtitles, or anything
+// implementing the Stremio "subtitles" resource). Base URL, like the stream
+// addon. Configured via a "subtitles=URL" line in streamfin-addon.txt.
+// Requests look like: {SUBTITLES_ADDON}/subtitles/{type}/{id}.json
+inline std::string SUBTITLES_ADDON;
+
 inline std::string trimJunk(std::string s) {
     auto junk = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '"' || c == '\''; };
     while (!s.empty() && junk(s.front())) s.erase(s.begin());
@@ -124,7 +130,10 @@ inline void saveConfig(const std::string& configDir) {
     ::mkdir(configDir.c_str(), 0777);
     try {
         std::ofstream out(addonConfigPath(configDir));
-        if (out.is_open()) out << nlohmann::json{{"url", STREAM_ADDON}, {"poster", POSTER_TEMPLATE}}.dump(2);
+        if (out.is_open())
+            out << nlohmann::json{
+                       {"url", STREAM_ADDON}, {"poster", POSTER_TEMPLATE}, {"subtitles", SUBTITLES_ADDON}}
+                       .dump(2);
     } catch (const std::exception& e) {
         brls::Logger::warning("saveConfig: {}", e.what());
     }
@@ -138,6 +147,7 @@ inline void loadAddon(const std::string& configDir) {
         in >> j;
         STREAM_ADDON = normalizeAddonUrl(jstr(j, "url"));
         POSTER_TEMPLATE = normalizePosterTemplate(jstr(j, "poster"));
+        SUBTITLES_ADDON = normalizeAddonUrl(jstr(j, "subtitles"));
     } catch (const std::exception& e) {
         brls::Logger::warning("loadAddon: {}", e.what());
     }
@@ -164,7 +174,7 @@ inline void importAddonFromFile(const std::string& configDir) {
         std::ifstream in(path);
         if (!in.is_open()) continue;
 
-        std::string url, poster, line;
+        std::string url, poster, subs, line;
         while (std::getline(in, line)) {
             line = trimJunk(line);
             if (line.rfind("poster=", 0) == 0) {
@@ -172,19 +182,22 @@ inline void importAddonFromFile(const std::string& configDir) {
             } else if (line.rfind("rpdb=", 0) == 0) {
                 std::string key = trimJunk(line.substr(5));
                 if (!key.empty()) poster = rpdbTemplate(key);
+            } else if (line.rfind("subtitles=", 0) == 0) {
+                subs = normalizeAddonUrl(line.substr(10));
             } else if (!line.empty() && line[0] != '#') {
                 std::string u = normalizeAddonUrl(line);
                 if (!u.empty()) url = u;
             }
         }
 
-        // The file is the source of truth: apply both values (an absent
-        // rpdb/poster line turns the poster provider off again). A missing
+        // The file is the source of truth: apply all values (an absent
+        // rpdb/poster/subtitles line turns that feature off again). A missing
         // addon line never wipes a working addon URL.
         std::string effectiveUrl = url.empty() ? STREAM_ADDON : url;
-        if (effectiveUrl != STREAM_ADDON || poster != POSTER_TEMPLATE) {
+        if (effectiveUrl != STREAM_ADDON || poster != POSTER_TEMPLATE || subs != SUBTITLES_ADDON) {
             STREAM_ADDON = effectiveUrl;
             POSTER_TEMPLATE = poster;
+            SUBTITLES_ADDON = subs;
             saveConfig(configDir);
             brls::Logger::info("settings imported from {}", path);
         }
@@ -250,6 +263,28 @@ struct MetaList {
     std::vector<Meta> metas;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MetaList, metas);
+
+// One subtitle offered by a subtitles addon (/subtitles/{type}/{id}.json).
+struct Subtitle {
+    std::string url;   // direct link to the .srt/.vtt file
+    std::string lang;  // ISO code or language name, addon-dependent
+};
+inline void from_json(const nlohmann::json& j, Subtitle& s) {
+    s.url = jstr(j, "url");
+    s.lang = jstr(j, "lang");
+}
+struct SubtitleList {
+    std::vector<Subtitle> subtitles;
+};
+inline void from_json(const nlohmann::json& j, SubtitleList& l) {
+    l.subtitles.clear();
+    auto it = j.find("subtitles");
+    if (it == j.end() || !it->is_array()) return;
+    for (auto& e : *it) {
+        Subtitle s = e.get<Subtitle>();
+        if (!s.url.empty()) l.subtitles.push_back(s);
+    }
+}
 
 // A single playable result from a stream addon (AIOStreams).
 struct Stream {

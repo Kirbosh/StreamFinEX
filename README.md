@@ -43,6 +43,7 @@ addon URL**, which the app asks for on first launch.
    ```
    https://your-stream-addon.example.com/...
    rpdb=YOUR_RPDB_KEY
+   subtitles=https://your-subtitles-addon.example.com/...
    ```
 3. Alternatively, launch without the file and type the URL into the on-screen keyboard when
    prompted (works, but long addon URLs are painful to type).
@@ -64,6 +65,18 @@ artwork**, add a poster provider to `streamfin-addon.txt`:
 
 When a poster provider is set, the text badge is hidden automatically (the rating is in the
 image). Remove the line to switch back.
+
+### Subtitles addon (optional)
+
+Embedded subtitle tracks always work out of the box. To also pull subtitles from a Stremio
+**subtitles addon** (SubSource, OpenSubtitles, …), add its base URL to `streamfin-addon.txt`:
+
+```
+subtitles=https://your-subtitles-addon.example.com/...
+```
+
+When playback starts, StreamFin fetches subtitles for that exact title/episode and adds them to
+the player — pick one under **+ → Subtitle** (one per language, alongside any embedded tracks).
 
 ## Controls
 
