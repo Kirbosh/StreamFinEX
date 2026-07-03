@@ -43,7 +43,8 @@ public:
         auto& s = this->list.at(index);
         cell->icon->setImageFromSVGRes("icon/ico-list.svg");
         cell->name->setText(s.label);
-        cell->detail->setText(fmt::format("{} episodes", s.episodes.size()));
+        cell->detail->setText(
+            s.episodes.size() == 1 ? "1 episode" : fmt::format("{} episodes", s.episodes.size()));
         return cell;
     }
 

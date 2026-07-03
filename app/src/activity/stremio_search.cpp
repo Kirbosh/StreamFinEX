@@ -66,12 +66,12 @@ public:
         cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
         cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
 
+        // Heart badge is the feedback — no toast (rapid toggling stacked them).
         bool fav = Favourites::instance().contains(item.id);
         cell->badgeFavorite->setVisibility(fav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
         cell->onToggleFav = [item, cell]() {
             bool nowFav = Favourites::instance().toggle(item);
             cell->badgeFavorite->setVisibility(nowFav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
-            brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
         };
 
         std::string poster = stremio::posterUrl(item.id, item.poster);

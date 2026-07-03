@@ -15,6 +15,9 @@
 class FavCardCell : public VideoCardCell {
 public:
     FavCardCell() {
+        // Long titles truncate with an ellipsis instead of marquee-scrolling
+        // on focus (the wrap-around showed two title fragments at once).
+        this->labelTitle->setAutoAnimate(false);
         this->registerAction("Favourite", brls::BUTTON_X, [this](brls::View*) {
             if (this->onToggleFav) this->onToggleFav();
             return true;

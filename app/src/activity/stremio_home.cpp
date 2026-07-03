@@ -86,13 +86,13 @@ public:
         cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
         cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
 
-        // Heart badge reflects favourite state; X toggles it.
+        // Heart badge reflects favourite state; X toggles it. The badge itself
+        // is the feedback — no toast (rapid toggling stacked them on screen).
         bool fav = Favourites::instance().contains(item.id);
         cell->badgeFavorite->setVisibility(fav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
         cell->onToggleFav = [item, cell]() {
             bool nowFav = Favourites::instance().toggle(item);
             cell->badgeFavorite->setVisibility(nowFav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
-            brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
         };
 
         std::string poster = stremio::posterUrl(item.id, item.poster);
@@ -276,19 +276,36 @@ void StremioHome::addFavouritesRow() {
     this->favRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->favRec);
 
-    Favourites::instance().changed()->subscribe([this]() { this->refreshFavourites(); });
+    // Deferred one frame so the X press finishes before the row (and possibly
+    // the pressed cell itself) is torn down and rebuilt.
+    Favourites::instance().changed()->subscribe([this]() {
+        brls::sync([this]() { this->refreshFavourites(); });
+    });
     this->refreshFavourites();
 }
 
 void StremioHome::refreshFavourites() {
+    // Same focus-parking dance as refreshContinue(): if focus is inside this
+    // row, park it on a stable row BEFORE the cells are destroyed, or the
+    // focus highlight is left stranded at stale coordinates.
+    bool focusHere = false;
+    for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+        if (f == this->favRec) {
+            focusHere = true;
+            break;
+        }
+    if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+
     auto& favs = Favourites::instance().all();
     if (favs.empty()) {
         this->favHeader->setVisibility(brls::Visibility::GONE);
         this->favRec->setVisibility(brls::Visibility::GONE);
+        // Row is gone; focus stays parked.
     } else {
         this->favHeader->setVisibility(brls::Visibility::VISIBLE);
         this->favRec->setVisibility(brls::Visibility::VISIBLE);
         this->favRec->setDataSource(new StremioSource(favs));
+        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
     }
 }
 
