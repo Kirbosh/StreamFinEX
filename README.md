@@ -24,7 +24,7 @@ addon URL**, which the app asks for on first launch.
 
 | Season list | On the home menu |
 |---|---|
-| ![Season list](images/capture-seasons.jpg) | ![hbmenu](images/capture-hbmenu.jpg) |
+| ![Season list](images/capture-seasons.jpg) | ![hbmenu](images/capture-home-menu.jpg) |
 
 ## Features
 
