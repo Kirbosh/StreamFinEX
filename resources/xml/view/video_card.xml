@@ -28,8 +28,8 @@
             svg="@res/icon/ico-library-badge.svg"
             visibility="invisible"
             positionType="absolute"
-            positionBottom="36"
-            positionRight="8"
+            positionBottom="8"
+            positionLeft="8"
             height="24" />
 
         <brls:Box
