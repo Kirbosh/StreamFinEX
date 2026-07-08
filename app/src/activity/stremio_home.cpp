@@ -25,10 +25,21 @@
 
 #include <ctime>
 #include <memory>
+#include <random>
 
 using namespace brls::literals;
 
 namespace {
+
+// Open the Cinemeta search via the on-screen keyboard (Y button / search icon).
+void openSearch() {
+    brls::Application::getImeManager()->openForText(
+        [](const std::string& text) {
+            if (!text.empty())
+                brls::Application::pushActivity(new brls::Activity(new StremioSearch(text)));
+        },
+        "Search movies & series", "", 64, "", 0);
+}
 
 // First-run / on-demand prompt for the stream addon URL (on-screen keyboard).
 void promptForAddon(const std::string& initial) {
@@ -271,6 +282,8 @@ StremioHome::StremioHome() {
     // the stream picker / detail screens too and land back on the home screen
     // with the Continue Watching row focused. Must be subscribed BEFORE
     // ResumeTracker::init(), whose own MPV_STOP handler clears isPlaying().
+    this->addTopBar();
+
     Favourites::instance().load();
     MPVCore::instance().getEvent()->subscribe([this](MpvEventEnum e) {
         if (e != MpvEventEnum::MPV_STOP && e != MpvEventEnum::END_OF_FILE) return;
@@ -292,16 +305,7 @@ StremioHome::StremioHome() {
     this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
     this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
     this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
-    // Surprise Me: a random genre catalog each launch.
-    {
-        static const char* genres[] = {"Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Family",
-            "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"};
-        std::srand((unsigned)now);
-        bool series = std::rand() & 1;
-        std::string genre = genres[std::rand() % 16];
-        this->addRow("Surprise Me", stremio::CINEMETA + std::string("/catalog/") + (series ? "series" : "movie") +
-                                        "/top/genre=" + genre + ".json");
-    }
+    this->addSurpriseRow();
     this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
     this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
     this->addRow("Action Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Action.json");
@@ -329,12 +333,7 @@ StremioHome::StremioHome() {
 
     // Y opens the on-screen keyboard to search Cinemeta.
     this->registerAction("Search", brls::BUTTON_Y, [](brls::View*) {
-        brls::Application::getImeManager()->openForText(
-            [](const std::string& text) {
-                if (!text.empty())
-                    brls::Application::pushActivity(new brls::Activity(new StremioSearch(text)));
-            },
-            "Search movies & series", "", 64, "", 0);
+        openSearch();
         return true;
     });
 
@@ -372,6 +371,105 @@ void StremioHome::popToHome() {
         brls::sync([this]() { this->popToHome(); });
     } else if (this->continueRec && this->continueRec->getVisibility() == brls::Visibility::VISIBLE) {
         brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+    }
+}
+
+// Top bar: small Stremio logo on the left, a round search button on the
+// right. Lives inside the scrolled column, so it scrolls away with the rows.
+void StremioHome::addTopBar() {
+    auto* bar = new brls::Box();
+    bar->setAxis(brls::Axis::ROW);
+    bar->setAlignItems(brls::AlignItems::CENTER);
+    bar->setMarginTop(8);
+    bar->setMarginLeft(50);
+    bar->setMarginRight(50);
+
+    auto* logo = new brls::Image();
+    logo->setDimensions(42, 42);
+    logo->setScalingType(brls::ImageScalingType::FIT);
+    logo->setImageFromRes("img/stremio-logo.png");
+    bar->addView(logo);
+
+    auto* spacer = new brls::Box();
+    spacer->setGrow(1.0f);
+    bar->addView(spacer);
+
+    auto* btn = new brls::Box();
+    btn->setFocusable(true);
+    btn->setPadding(9, 9, 9, 9);
+    btn->setCornerRadius(21);
+    btn->setBackgroundColor(nvgRGBA(255, 255, 255, 22));
+    btn->setHideHighlightBackground(true);
+    btn->setHighlightCornerRadius(21);
+    auto* icon = new SVGImage();
+    icon->setDimensions(24, 24);
+    icon->setImageFromSVGRes("icon/ico-search-white.svg");
+    btn->addView(icon);
+    btn->registerClickAction([](brls::View*) {
+        openSearch();
+        return true;
+    });
+    btn->addGestureRecognizer(new brls::TapGestureRecognizer(btn));
+    bar->addView(btn);
+
+    this->boxHome->addView(bar);
+}
+
+// Surprise Me: a shuffled blend of several random genre catalogs — genuinely
+// random picks each launch, not just one randomly chosen category.
+void StremioHome::addSurpriseRow() {
+    auto* header = new brls::Label();
+    styleRowHeader(header, "Surprise Me");
+    this->boxHome->addView(header);
+
+    auto* rec = new HRecyclerFrame();
+    rec->setHeight(300);
+    rec->estimatedRowWidth = 175;
+    rec->setPadding(0, 50, 0, 50);
+    rec->registerCell("Cell", FavCardCell::create);
+    this->boxHome->addView(rec);
+    rec->showSkeleton(8);
+
+    static const char* genres[] = {"Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Family",
+        "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"};
+    unsigned seed = (unsigned)std::time(nullptr);
+    std::mt19937 rng(seed);
+
+    // Pull 4 random catalogs, merge (deduped), shuffle, keep 20.
+    auto pool = std::make_shared<std::vector<stremio::Meta>>();
+    auto pending = std::make_shared<int>(4);
+    auto finish = [rec, pool, pending, seed]() {
+        if (--(*pending) > 0) return;
+        if (pool->empty()) return;
+        std::shuffle(pool->begin(), pool->end(), std::mt19937(seed));
+        if (pool->size() > 20) pool->resize(20);
+        rec->setDataSource(new StremioSource(*pool));
+    };
+
+    for (int i = 0; i < 4; i++) {
+        std::string type = (rng() & 1) ? "series" : "movie";
+        std::string genre = genres[rng() % 16];
+        std::string url = stremio::CINEMETA + "/catalog/" + type + "/top/genre=" + genre + ".json";
+        ASYNC_RETAIN
+        stremio::getJSON<stremio::MetaList>(
+            [ASYNC_TOKEN, pool, finish](stremio::MetaList r) {
+                ASYNC_RELEASE
+                for (auto& m : r.metas) {
+                    bool dup = false;
+                    for (auto& p : *pool)
+                        if (p.id == m.id) {
+                            dup = true;
+                            break;
+                        }
+                    if (!dup) pool->push_back(m);
+                }
+                finish();
+            },
+            [ASYNC_TOKEN, finish](const std::string&) {
+                ASYNC_RELEASE
+                finish();
+            },
+            url);
     }
 }
 
