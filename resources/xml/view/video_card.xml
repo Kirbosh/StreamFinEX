@@ -25,10 +25,10 @@
 
         <SVGImage
             id="video/card/badge/favorite"
-            svg="@res/icon/ico-heart.svg"
+            svg="@res/icon/ico-heart-outline.svg"
             visibility="invisible"
             positionType="absolute"
-            positionBottom="8"
+            positionBottom="36"
             positionRight="8"
             height="24" />
 

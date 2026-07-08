@@ -41,9 +41,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.0
-        tag_name: v0.3.0
+        name: StreamFinEX v0.3.1
+        tag_name: v0.3.1
         files: build/StreamFin.nro
         body: |
-          Stremio ocean theme, column-true row navigation, focus glow, official Stremio icon.
+          Library grid with search+sort, smoother cell-aligned carousels, continue-watching fixes, more catalog rows.
           Copy `StreamFin.nro` to `/switch/` on your SD card.

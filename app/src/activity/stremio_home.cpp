@@ -12,6 +12,8 @@
 #include "activity/stremio_search.hpp"
 #include "activity/stremio_favourites.hpp"
 #include "activity/stremio_resume.hpp"
+#include "activity/stremio_library.hpp"
+#include "view/mpv_core.hpp"
 #include "view/recycling_grid.hpp"
 #include "view/h_recycling.hpp"
 #include "view/video_card.hpp"
@@ -115,6 +117,61 @@ private:
     std::vector<stremio::Meta> list;
 };
 
+// Home "Library" row: the newest few saved titles plus a final "See all" card
+// that opens the full library grid.
+class LibraryRowSource : public RecyclingGridDataSource {
+public:
+    explicit LibraryRowSource(std::vector<stremio::Meta> r) : list(std::move(r)) {}
+
+    size_t getItemCount() override { return this->list.size() + 1; }  // + See-all card
+
+    RecyclingGridItem* cellForRow(RecyclingView* recycler, size_t index) override {
+        FavCardCell* cell = dynamic_cast<FavCardCell*>(recycler->dequeueReusableCell("Cell"));
+        cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
+        cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
+        cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+
+        if (index == this->list.size()) {  // the See-all card
+            cell->labelTitle->setText("Library");
+            cell->labelExt->setText(this->list.empty() ? "Nothing saved yet" : "See all");
+            cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
+            cell->badgeFavorite->setVisibility(brls::Visibility::INVISIBLE);
+            cell->onToggleFav = nullptr;
+            return cell;
+        }
+
+        auto item = this->list.at(index);
+        cell->labelTitle->setText(item.name);
+        if (item.year.empty()) {
+            cell->labelExt->setVisibility(brls::Visibility::GONE);
+        } else {
+            cell->labelExt->setText(item.year);
+            cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
+        }
+        cell->badgeFavorite->setVisibility(brls::Visibility::VISIBLE);
+        cell->onToggleFav = [item]() { Favourites::instance().toggle(item); };
+
+        std::string poster = stremio::posterUrl(item.id, item.poster);
+        if (!poster.empty()) Image::with(cell->picture, poster);
+        return cell;
+    }
+
+    void onItemSelected(brls::Box* recycler, size_t index) override {
+        if (index == this->list.size()) {
+            brls::Application::pushActivity(
+                new brls::Activity(new StremioLibrary()), brls::TransitionAnimation::NONE);
+            return;
+        }
+        brls::Application::pushActivity(
+            new brls::Activity(new StremioDetail(this->list.at(index))), brls::TransitionAnimation::NONE);
+    }
+
+    void clearData() override { this->list.clear(); }
+
+private:
+    std::vector<stremio::Meta> list;
+};
+
 // Continue Watching: poster cards with a progress bar; selecting one fetches
 // streams and resumes where you left off.
 class ContinueSource : public RecyclingGridDataSource {
@@ -205,8 +262,16 @@ StremioHome::StremioHome() {
 
     this->addView(scroll);
 
-    // Continue Watching (very top) + Favourites rows — both hidden until non-empty.
+    // When stremio playback stops (B in the player or the file ended), close
+    // the stream picker / detail screens too and land back on the home screen
+    // with the Continue Watching row focused. Must be subscribed BEFORE
+    // ResumeTracker::init(), whose own MPV_STOP handler clears isPlaying().
     Favourites::instance().load();
+    MPVCore::instance().getEvent()->subscribe([this](MpvEventEnum e) {
+        if (e != MpvEventEnum::MPV_STOP && e != MpvEventEnum::END_OF_FILE) return;
+        if (!ResumeTracker::instance().isPlaying()) return;
+        brls::sync([this]() { this->popToHome(); });
+    });
     ResumeTracker::instance().init();
     this->addContinueRow();
     this->addFavouritesRow();
@@ -224,6 +289,14 @@ StremioHome::StremioHome() {
     this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
     this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
     this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
+    this->addRow("Action Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Action.json");
+    this->addRow("Comedy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Comedy.json");
+    this->addRow("Comedy Series", stremio::CINEMETA + "/catalog/series/top/genre=Comedy.json");
+    this->addRow("Sci-Fi Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Sci-Fi.json");
+    this->addRow("Drama Series", stremio::CINEMETA + "/catalog/series/top/genre=Drama.json");
+    this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
+    this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
+    this->addRow("Fantasy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Fantasy.json");
     this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
     this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
 
@@ -254,6 +327,15 @@ void StremioHome::draw(
     brls::Box::draw(vg, x, y, width, height, style, ctx);
 }
 
+// Pop one activity per frame until home is on top, then focus Continue Watching.
+void StremioHome::popToHome() {
+    if (brls::Application::popActivity(brls::TransitionAnimation::NONE)) {
+        brls::sync([this]() { this->popToHome(); });
+    } else if (this->continueRec && this->continueRec->getVisibility() == brls::Visibility::VISIBLE) {
+        brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+    }
+}
+
 void StremioHome::addRow(const std::string& title, const std::string& url) {
     auto* header = new brls::Label();
     styleRowHeader(header, title);
@@ -279,7 +361,7 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
 
 void StremioHome::addFavouritesRow() {
     this->favHeader = new brls::Label();
-    styleRowHeader(this->favHeader, "Favourites");
+    styleRowHeader(this->favHeader, "Library");
     this->boxHome->addView(this->favHeader);
 
     this->favRec = new HRecyclerFrame();
@@ -308,17 +390,15 @@ void StremioHome::refreshFavourites() {
         }
     if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
 
+    // The Library row is ALWAYS visible: up to 4 newest saved titles plus the
+    // "See all" card (which is the whole row when the library is empty). Not
+    // toggling the row's visibility also removes the stranded-outline glitch
+    // the appear/disappear cycle used to cause.
     auto& favs = Favourites::instance().all();
-    if (favs.empty()) {
-        this->favHeader->setVisibility(brls::Visibility::GONE);
-        this->favRec->setVisibility(brls::Visibility::GONE);
-        // Row is gone; focus stays parked.
-    } else {
-        this->favHeader->setVisibility(brls::Visibility::VISIBLE);
-        this->favRec->setVisibility(brls::Visibility::VISIBLE);
-        this->favRec->setDataSource(new StremioSource(favs));
-        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
-    }
+    std::vector<stremio::Meta> newest(favs.rbegin(), favs.rend());
+    if (newest.size() > 4) newest.resize(4);
+    this->favRec->setDataSource(new LibraryRowSource(std::move(newest)));
+    if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
     // Force a clean relayout (see refreshContinue for why).
     this->boxHome->invalidate();
 }

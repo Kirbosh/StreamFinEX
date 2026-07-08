@@ -157,10 +157,10 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
         return true;
     });
 
-    // X toggles favourite here too, matching the poster grids.
-    this->registerAction("Favourite", brls::BUTTON_X, [this](brls::View*) {
+    // X toggles library membership here too, matching the poster grids.
+    this->registerAction("Library", brls::BUTTON_X, [this](brls::View*) {
         bool nowFav = Favourites::instance().toggle(this->item);
-        brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
+        brls::Application::notify(nowFav ? "Added to Library" : "Removed from Library");
         return true;
     });
 

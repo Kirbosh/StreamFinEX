@@ -26,6 +26,7 @@ private:
     void refreshFavourites();
     void addContinueRow();
     void refreshContinue();
+    void popToHome();  // close everything above home after playback stops
     void enrichContinue();  // fetch English titles from Cinemeta, then rebuild once
 
     brls::Box* boxHome = nullptr;          // column container inside the scroll
