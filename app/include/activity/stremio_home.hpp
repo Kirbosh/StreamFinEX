@@ -23,6 +23,8 @@ public:
 private:
     void addRow(const std::string& title, const std::string& url);
     void addAnimeRow();  // Kitsu trending + More card (anime browse/search)
+    void buildRows();    // add catalog rows per the saved row config
+    void rebuildRows();  // re-apply row config after the editor closes
     void addTopBar();       // stremio logo + search button (scrolls with content)
     void addFavouritesRow();
     void refreshFavourites();
@@ -40,5 +42,6 @@ private:
     brls::Label* continueHeader = nullptr;  // "Continue Watching" title (hidden when empty)
     HRecyclerFrame* continueRec = nullptr;  // continue-watching carousel
     HRecyclerFrame* firstRowRec = nullptr;  // first catalog row; safe focus parking spot
-    bool continueEnriching = false;         // a Cinemeta title-refresh pass is in flight
+    bool continueEnriching = false;
+    bool rowsSubscribed = false;            // continue/library events hooked once         // a Cinemeta title-refresh pass is in flight
 };

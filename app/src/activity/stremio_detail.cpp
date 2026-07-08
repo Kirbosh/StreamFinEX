@@ -25,6 +25,50 @@ const NVGcolor COL_TEXT   = stremio_theme::TEXT;      // soft white
 const NVGcolor COL_DIM    = stremio_theme::TEXT_DIM;  // secondary text
 const NVGcolor COL_ACCENT = stremio_theme::ACCENT_HI; // light Stremio purple (meta line)
 
+// Fullscreen scrollable description: everything else stays still; the text
+// scrolls with up/down. Opened by the blue "See more" under the description.
+class DescriptionScreen : public brls::Box {
+public:
+    DescriptionScreen(const std::string& title, const std::string& text) {
+        this->setAxis(brls::Axis::COLUMN);
+        this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
+        this->setPadding(40, 120, 40, 120);
+
+        auto* head = new brls::Label();
+        head->setText(title);
+        head->setFontSize(34);
+        head->setTextColor(stremio_theme::TEXT);
+        head->setMarginBottom(20);
+        this->addView(head);
+
+        auto* scroll = new brls::ScrollingFrame();
+        scroll->setGrow(1.0f);
+        scroll->setHideHighlight(true);  // the frame itself takes focus to scroll
+        auto* body = new brls::Box();
+        body->setAxis(brls::Axis::COLUMN);
+        auto* lbl = new brls::Label();
+        lbl->setText(text);
+        lbl->setFontSize(24);
+        lbl->setTextColor(stremio_theme::TEXT_DIM);
+        lbl->setIsWrapping(true);
+        body->addView(lbl);
+        scroll->setContentView(body);
+        this->addView(scroll);
+
+        this->registerAction("hints/back"_i18n, brls::BUTTON_B, [](brls::View*) {
+            brls::Application::popActivity();
+            return true;
+        });
+        brls::sync([scroll]() { brls::Application::giveFocus(scroll); });
+    }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
+        brls::FrameContext* ctx) override {
+        stremio_theme::drawOceanBackground(vg, x, y, width, height);
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+};
+
 // Join a string list: {"A","B"} -> "A, B".
 std::string join(const std::vector<std::string>& v, const char* sep = ", ") {
     std::string out;
@@ -131,6 +175,31 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     this->labelDesc->setMarginTop(24);
     info->addView(this->labelDesc);
 
+    // Blue "See more" pill — only shown when the description was truncated.
+    this->btnMore = new brls::Box();
+    this->btnMore->setFocusable(true);
+    this->btnMore->setAxis(brls::Axis::ROW);
+    this->btnMore->setPadding(6, 14, 6, 14);
+    this->btnMore->setCornerRadius(6);
+    this->btnMore->setMarginTop(8);
+    this->btnMore->setMaxWidth(160);
+    this->btnMore->setHideHighlightBackground(true);
+    this->btnMore->setHighlightCornerRadius(8);
+    this->btnMore->setVisibility(brls::Visibility::GONE);
+    auto* moreLbl = new brls::Label();
+    moreLbl->setText("See more");
+    moreLbl->setFontSize(20);
+    moreLbl->setTextColor(nvgRGB(96, 150, 255));  // link blue
+    this->btnMore->addView(moreLbl);
+    this->btnMore->registerClickAction([this](brls::View*) {
+        brls::Application::pushActivity(
+            new brls::Activity(new DescriptionScreen(this->item.name, this->fullDesc)),
+            brls::TransitionAnimation::NONE);
+        return true;
+    });
+    this->btnMore->addGestureRecognizer(new brls::TapGestureRecognizer(this->btnMore));
+    info->addView(this->btnMore);
+
     this->labelCastHead = new brls::Label();
     this->labelCastHead->setText("Cast");
     this->labelCastHead->setFontSize(24);
@@ -229,7 +298,20 @@ void StremioDetail::applyMeta(const stremio::MetaDetail& meta) {
         this->labelGenres->setVisibility(brls::Visibility::VISIBLE);
     }
 
-    this->labelDesc->setText(!meta.description.empty() ? meta.description : "No description available.");
+    // Long descriptions overflowed off-screen (nothing on this screen
+    // scrolls). Clamp the inline text and reveal the rest behind "See more".
+    this->fullDesc = !meta.description.empty() ? meta.description : "No description available.";
+    const size_t maxInline = 240;
+    if (this->fullDesc.size() > maxInline) {
+        std::string cut = this->fullDesc.substr(0, maxInline);
+        size_t sp = cut.find_last_of(' ');
+        if (sp != std::string::npos && sp > maxInline / 2) cut.resize(sp);
+        this->labelDesc->setText(cut + "…");
+        this->btnMore->setVisibility(brls::Visibility::VISIBLE);
+    } else {
+        this->labelDesc->setText(this->fullDesc);
+        this->btnMore->setVisibility(brls::Visibility::GONE);
+    }
 
     if (!meta.cast.empty()) {
         this->labelCast->setText(join(meta.cast));
@@ -270,24 +352,21 @@ void StremioDetail::openStreams() {
     brls::Application::notify("Finding streams…");
 
     std::string name = this->item.name;
-    std::string url = stremio::STREAM_ADDON + "/stream/" + this->item.type + "/" + this->item.id + ".json";
-    ResumeEntry key{this->item.type, this->item.id, this->item.name, this->item.poster};
-
     ASYNC_RETAIN
-    stremio::getJSON<stremio::StreamList>(
-        [ASYNC_TOKEN, name, key](stremio::StreamList r) {
+    stremio::fetchStreams(this->item.type, this->item.id,
+        [ASYNC_TOKEN, name](stremio::StreamList r, std::string usedType) {
             ASYNC_RELEASE
             this->fetching = false;
             if (r.streams.empty()) {
                 brls::Application::notify("No streams found");
                 return;
             }
+            ResumeEntry key{usedType, this->item.id, this->item.name, this->item.poster};
             brls::Application::pushActivity(new brls::Activity(new StreamPicker(name, r.streams, key)));
         },
         [ASYNC_TOKEN](const std::string& e) {
             ASYNC_RELEASE
             this->fetching = false;
             brls::Application::notify("Stream error: " + e);
-        },
-        url);
+        });
 }

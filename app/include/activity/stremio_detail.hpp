@@ -42,4 +42,6 @@ private:
     brls::Label* labelDirector = nullptr;
     brls::Box* btnWatch = nullptr;
     brls::Label* btnLabel = nullptr;
+    brls::Box* btnMore = nullptr;      // "See more" (opens scrollable description)
+    std::string fullDesc;
 };

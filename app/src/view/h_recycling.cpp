@@ -64,6 +64,24 @@ void HRecyclerFrame::onChildFocusGained(brls::View* directChild, brls::View* foc
     setContentOffsetX(target, true);
 }
 
+void HRecyclerFrame::focusNearest(float x) {
+    brls::View* nearest = nullptr;
+    float nearestDist = 0;
+    for (auto* child : this->contentBox->getChildren()) {
+        brls::View* focus = child->getDefaultFocus();
+        if (!focus) continue;
+        float dist = std::fabs(focus->getFrame().getMidX() - x);
+        if (!nearest || dist < nearestDist) {
+            nearest = focus;
+            nearestDist = dist;
+        }
+    }
+    if (nearest) {
+        this->contentBox->setLastFocusedView(nearest);
+        brls::Application::giveFocus(nearest);
+    }
+}
+
 HRecyclerFrame::HRecyclerFrame() {
     brls::Logger::debug("View HRecyclerFrame: create");
 

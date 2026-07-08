@@ -114,17 +114,17 @@ public:
         std::string label = this->seriesName.empty()
             ? fmt::format("S{}E{} · {}", v.season, v.episode, v.name)
             : fmt::format("{} · S{}E{} · {}", this->seriesName, v.season, v.episode, v.name);
-        std::string url = stremio::STREAM_ADDON + "/stream/series/" + v.id + ".json";
-        ResumeEntry key{"series", v.id, label, v.thumbnail};
-        stremio::getJSON<stremio::StreamList>(
-            [label, key](stremio::StreamList r) {
+        std::string vid = v.id, thumb = v.thumbnail;
+        stremio::fetchStreams("series", vid,
+            [label, vid, thumb](stremio::StreamList r, std::string usedType) {
                 if (r.streams.empty()) {
                     brls::Application::notify("No streams found");
                     return;
                 }
+                ResumeEntry key{usedType, vid, label, thumb};
                 brls::Application::pushActivity(new brls::Activity(new StreamPicker(label, r.streams, key)));
             },
-            [](const std::string& e) { brls::Application::notify("Stream error: " + e); }, url);
+            [](const std::string& e) { brls::Application::notify("Stream error: " + e); });
     }
 
     void clearData() override { this->list.clear(); }

@@ -44,9 +44,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.6
-        tag_name: v0.3.6
+        name: StreamFinEX v0.3.7
+        tag_name: v0.3.7
         files: build/StreamFin.nro
         body: |
-          No more floating outlines while loading; working Anime row with browse+search screen; Library card at slot 6; Surprise Me removed.
+          Customizable home rows (press the logo); anime stream fallback; See more description; no scroll jolt on library removal.
           Copy `StreamFin.nro` to `/switch/` on your SD card.

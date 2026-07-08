@@ -564,4 +564,46 @@ struct MetaResult {
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MetaResult, meta);
 
+
+// ---------------------------------------------------------------------------
+// Stream lookup with kitsu type fallback
+// ---------------------------------------------------------------------------
+// Stream addons disagree on which type kitsu ids live under (anime / series /
+// movie), so for kitsu ids each type is tried until one returns streams.
+// `then` also receives the type that worked (for resume bookkeeping).
+inline void fetchStreams(const std::string& type, const std::string& id,
+    std::function<void(StreamList, std::string)> then, OnError error) {
+    auto types = std::make_shared<std::vector<std::string>>();
+    types->push_back(type);
+    if (id.rfind("kitsu:", 0) == 0)
+        for (const char* t : {"series", "anime", "movie"})
+            if (t != type) types->push_back(t);
+
+    auto attempt = std::make_shared<std::function<void(size_t)>>();
+    *attempt = [types, then, error, id, attempt](size_t i) {
+        if (i >= types->size()) {
+            error("no streams found");
+            return;
+        }
+        std::string t = (*types)[i];
+        getJSON<StreamList>(
+            [then, t, attempt, i, types](StreamList r) {
+                if (!r.streams.empty())
+                    then(std::move(r), t);
+                else if (i + 1 < types->size())
+                    (*attempt)(i + 1);
+                else
+                    then(std::move(r), t);  // let the caller show "No streams"
+            },
+            [attempt, i, error, types](const std::string& e) {
+                if (i + 1 < types->size())
+                    (*attempt)(i + 1);
+                else
+                    error(e);
+            },
+            STREAM_ADDON + "/stream/" + t + "/" + id + ".json");
+    };
+    (*attempt)(0);
+}
+
 }  // namespace stremio

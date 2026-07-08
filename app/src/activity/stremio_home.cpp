@@ -14,6 +14,7 @@
 #include "activity/stremio_resume.hpp"
 #include "activity/stremio_library.hpp"
 #include "activity/stremio_anime.hpp"
+#include "activity/stremio_rows.hpp"
 #include "view/mpv_core.hpp"
 #include "view/recycling_grid.hpp"
 #include "view/h_recycling.hpp"
@@ -290,16 +291,15 @@ public:
             return;
         }
         brls::Application::notify("Finding streams…");
-        std::string url = stremio::STREAM_ADDON + "/stream/" + e.streamType + "/" + e.streamId + ".json";
-        stremio::getJSON<stremio::StreamList>(
-            [e](stremio::StreamList r) {
+        stremio::fetchStreams(e.streamType, e.streamId,
+            [e](stremio::StreamList r, std::string) {
                 if (r.streams.empty()) {
                     brls::Application::notify("No streams found");
                     return;
                 }
                 brls::Application::pushActivity(new brls::Activity(new StreamPicker(e.name, r.streams, e)));
             },
-            [](const std::string& err) { brls::Application::notify("Stream error: " + err); }, url);
+            [](const std::string& err) { brls::Application::notify("Stream error: " + err); });
     }
 
     void clearData() override { this->list.clear(); }
@@ -352,40 +352,7 @@ StremioHome::StremioHome() {
     this->addContinueRow();
     this->addFavouritesRow();
 
-    // Cinemeta catalogs: top = Popular, year = New (newest releases),
-    // imdbRating = Top Rated. The /year catalog requires a year value.
-    this->addRow("Popular Movies", stremio::CINEMETA + "/catalog/movie/top.json");
-    this->addRow("Popular Series", stremio::CINEMETA + "/catalog/series/top.json");
-    // Current year computed at runtime, so "New" auto-rolls each year (no manual edit).
-    std::time_t now = std::time(nullptr);
-    std::string year = std::to_string(1900 + std::localtime(&now)->tm_year);
-    this->addRow("New Movies", stremio::CINEMETA + "/catalog/movie/year/genre=" + year + ".json");
-    this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
-    this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
-    this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
-    this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
-    this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
-    this->addRow("Action Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Action.json");
-    this->addRow("Action Series", stremio::CINEMETA + "/catalog/series/top/genre=Action.json");
-    this->addRow("Sci-Fi Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Sci-Fi.json");
-    this->addRow("Sci-Fi Series", stremio::CINEMETA + "/catalog/series/top/genre=Sci-Fi.json");
-    this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
-    this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
-    this->addAnimeRow();  // trending anime (Kitsu addon) + More card
-    this->addRow("Comedy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Comedy.json");
-    this->addRow("Comedy Series", stremio::CINEMETA + "/catalog/series/top/genre=Comedy.json");
-    this->addRow("War Movies", stremio::CINEMETA + "/catalog/movie/top/genre=War.json");
-    this->addRow("Drama Series", stremio::CINEMETA + "/catalog/series/top/genre=Drama.json");
-    this->addRow("Fantasy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Fantasy.json");
-    this->addRow("Fantasy Series", stremio::CINEMETA + "/catalog/series/top/genre=Fantasy.json");
-    this->addRow("Crime Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Crime.json");
-    this->addRow("Crime Series", stremio::CINEMETA + "/catalog/series/top/genre=Crime.json");
-    this->addRow("Mystery Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Mystery.json");
-    this->addRow("Mystery Series", stremio::CINEMETA + "/catalog/series/top/genre=Mystery.json");
-    this->addRow("Romance Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Romance.json");
-    this->addRow("Western Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Western.json");
-    this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
-    this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
+    this->buildRows();
 
     // Y opens the on-screen keyboard to search Cinemeta.
     this->registerAction("Search", brls::BUTTON_Y, [](brls::View*) {
@@ -440,11 +407,27 @@ void StremioHome::addTopBar() {
     bar->setMarginLeft(50);
     bar->setMarginRight(50);
 
+    auto* logoBtn = new brls::Box();
+    logoBtn->setFocusable(true);
+    logoBtn->setPadding(4, 4, 4, 4);
+    logoBtn->setCornerRadius(12);
+    logoBtn->setHideHighlightBackground(true);
+    logoBtn->setHighlightCornerRadius(14);
     auto* logo = new brls::Image();
     logo->setDimensions(42, 42);
     logo->setScalingType(brls::ImageScalingType::FIT);
     logo->setImageFromRes("img/stremio-logo.png");
-    bar->addView(logo);
+    logoBtn->addView(logo);
+    // The logo opens the home-row editor; changes rebuild the rows in place
+    // (deferred two frames so the editor pop fully finishes first).
+    logoBtn->registerClickAction([this](brls::View*) {
+        brls::Application::pushActivity(new brls::Activity(new StremioRows([this]() {
+            brls::sync([this]() { brls::sync([this]() { this->rebuildRows(); }); });
+        })), brls::TransitionAnimation::NONE);
+        return true;
+    });
+    logoBtn->addGestureRecognizer(new brls::TapGestureRecognizer(logoBtn));
+    bar->addView(logoBtn);
 
     auto* spacer = new brls::Box();
     spacer->setGrow(1.0f);
@@ -469,6 +452,46 @@ void StremioHome::addTopBar() {
     bar->addView(btn);
 
     this->boxHome->addView(bar);
+}
+
+// Catalog rows per the saved row config (editable via the top-bar logo).
+void StremioHome::buildRows() {
+    for (auto& r : rowcfg::load()) {
+        if (!r.second) continue;
+        if (r.first == "anime") {
+            this->addAnimeRow();
+            continue;
+        }
+        const rowcfg::RowDef* def = rowcfg::find(r.first);
+        if (def) this->addRow(def->title, def->url);
+    }
+}
+
+// Tear down and rebuild everything inside the scroll after the row editor
+// closes. Focus is parked on the home root (hidden highlight) while the old
+// rows are freed, so nothing dangles.
+void StremioHome::rebuildRows() {
+    this->setFocusable(true);
+    this->setHideHighlight(true);
+    brls::Application::giveFocus(this);
+
+    this->firstRowRec = nullptr;
+    this->favRec = nullptr;
+    this->continueRec = nullptr;
+    this->favHeader = nullptr;
+    this->continueHeader = nullptr;
+    this->boxHome->clearViews(true);
+
+    this->addTopBar();
+    this->addContinueRow();
+    this->addFavouritesRow();
+    this->buildRows();
+    this->boxHome->invalidate();
+
+    this->setFocusable(false);
+    brls::sync([this]() {
+        if (this->favRec) brls::Application::giveFocus(this->favRec);
+    });
 }
 
 // Anime row: 5 trending titles from Kitsu + the More card. The card is shown
@@ -537,10 +560,12 @@ void StremioHome::addFavouritesRow() {
     this->boxHome->addView(this->favRec);
 
     // Deferred one frame so the X press finishes before the row (and possibly
-    // the pressed cell itself) is torn down and rebuilt.
-    Favourites::instance().changed()->subscribe([this]() {
-        brls::sync([this]() { this->refreshFavourites(); });
-    });
+    // the pressed cell itself) is torn down and rebuilt. Subscribed once —
+    // rebuildRows() recreates the row but must not stack subscriptions.
+    if (!this->rowsSubscribed)
+        Favourites::instance().changed()->subscribe([this]() {
+            brls::sync([this]() { this->refreshFavourites(); });
+        });
     this->refreshFavourites();
 }
 
@@ -554,7 +579,7 @@ void StremioHome::refreshFavourites() {
             focusHere = true;
             break;
         }
-    if (focusHere) this->parkFocus(this->favRec);
+    float focusX = focusHere ? brls::Application::getCurrentFocus()->getFrame().getMidX() : 0;
 
     // The Library row is ALWAYS visible: up to 4 newest saved titles plus the
     // "See all" card (which is the whole row when the library is empty). Not
@@ -564,7 +589,9 @@ void StremioHome::refreshFavourites() {
     std::vector<stremio::Meta> newest(favs.rbegin(), favs.rend());
     if (newest.size() > 5) newest.resize(5);
     this->favRec->setDataSource(new LibraryRowSource(std::move(newest)));
-    if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
+    // Focus goes straight to the nearest new cell — parking on another row
+    // first made the whole screen jolt up and down for a frame.
+    if (focusHere) brls::sync([this, focusX]() { this->favRec->focusNearest(focusX); });
     // Force a clean relayout (see refreshContinue for why).
     this->boxHome->invalidate();
 }
@@ -581,7 +608,8 @@ void StremioHome::addContinueRow() {
     this->continueRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->continueRec);
 
-    ResumeTracker::instance().changed()->subscribe([this]() { this->refreshContinue(); });
+    if (!this->rowsSubscribed) ResumeTracker::instance().changed()->subscribe([this]() { this->refreshContinue(); });
+    this->rowsSubscribed = true;
     this->refreshContinue();
 }
 
@@ -600,9 +628,12 @@ void StremioHome::refreshContinue() {
     // to the home box so focus can never stay on a cell about to be destroyed
     // (that left a floating outline through which the removed item was still
     // openable).
-    if (focusHere && !this->parkFocus(this->continueRec)) brls::Application::giveFocus(this);
-
+    float focusX = focusHere ? brls::Application::getCurrentFocus()->getFrame().getMidX() : 0;
     auto cw = ResumeTracker::instance().continueWatching();
+    // Only when the row is about to disappear does focus need to move to
+    // another row (parking); otherwise it goes straight to the nearest new
+    // cell after the rebuild, which avoids the up-down scroll jolt.
+    if (focusHere && cw.empty() && !this->parkFocus(this->continueRec)) brls::Application::giveFocus(this);
     if (cw.empty()) {
         this->continueHeader->setVisibility(brls::Visibility::GONE);
         this->continueRec->setVisibility(brls::Visibility::GONE);
@@ -613,7 +644,7 @@ void StremioHome::refreshContinue() {
         this->continueHeader->setVisibility(brls::Visibility::VISIBLE);
         this->continueRec->setVisibility(brls::Visibility::VISIBLE);
         this->continueRec->setDataSource(new ContinueSource(cw));
-        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+        if (focusHere) brls::sync([this, focusX]() { this->continueRec->focusNearest(focusX); });
         this->enrichContinue();  // resolve any non-English / stale titles, then rebuild once
     }
     // Force a clean relayout of the whole column: a row toggling between
@@ -654,9 +685,9 @@ void StremioHome::enrichContinue() {
                 focusHere = true;
                 break;
             }
-        if (focusHere) this->parkFocus(this->continueRec);
+        float focusX = focusHere ? brls::Application::getCurrentFocus()->getFrame().getMidX() : 0;
         this->continueRec->setDataSource(new ContinueSource(fresh));
-        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+        if (focusHere) brls::sync([this, focusX]() { this->continueRec->focusNearest(focusX); });
     };
 
     for (auto& e : todo) {
