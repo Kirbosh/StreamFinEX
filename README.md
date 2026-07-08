@@ -8,20 +8,17 @@ A **streaming-only Stremio client for homebrewed Nintendo Switch**. This is a fo
 [StreamFin](https://github.com/scamNscoot/StreamFin) (itself built on
 [Switchfin](https://github.com/dragonflylee/switchfin), with the Jellyfin data layer replaced by
 the [Stremio addon protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md)),
-focused on making the experience look and feel like **actual Stremio**: dark ocean blue/purple
-theme, Stremio-style focus glow, and smarter controller navigation.
+focused on making the experience look and feel like **actual Stremio**.
 
 Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a stream, and play —
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
 addon URL**, which the app asks for on first launch.
 
-## What this fork changes (v0.3.0)
+## Download
 
-- **Stremio-style theme** — dark ocean-navy gradient background with purple/blue washes, purple
-  accents, and the focus outline pulsing between ocean blue and Stremio purple with a soft glow
-- **Column-true navigation** — moving between rows lands on the poster directly above/below the
-  one you're on (shorter rows clamp to their closest poster), and each press hops exactly one row
-- **Focus outline fixes** — the outline no longer fades away while you rest on a poster
+Grab the latest `StreamFin.nro` from the
+[**Releases page**](https://github.com/Kirbosh/StreamFinEX/releases) and copy it to `/switch/`
+on your SD card. Every push to this repo builds a fresh release automatically.
 
 ## Screenshots
 
@@ -29,20 +26,25 @@ addon URL**, which the app asks for on first launch.
 |---|---|
 | ![Home screen](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
 
-*(theme previews captured on the desktop build with placeholder posters)*
-
 | Episodes | Playback |
 |---|---|
 | ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-play.jpg) |
 
 ## Features
 
-- **Home screen** — poster carousels: Popular / New / Top Rated / Animation / Documentary,
-  movies & series (Cinemeta), with **IMDb rating badges** on every poster
+- **Stremio-style look** — dark ocean-navy gradient theme with purple accents, official Stremio
+  icon, and a glowing focus outline that breathes between ocean blue and purple
+- **32 home rows** — Popular / New / Top Rated / genre rows for movies & series (Cinemeta),
+  a **Surprise Me** row with random picks each launch, and **Anime** via the Kitsu addon,
+  with **IMDb rating badges** on every poster
+- **Smart navigation** — moving between rows lands on the poster directly above/below you;
+  rows scroll poster-by-poster with a sliver of the next/previous poster at each edge
+- **Library** — save any title with X (dot badge); the home row shows your newest saves plus a
+  See-all card opening a full grid with **search and sort** (recent / name / year / rating)
+- **Continue Watching** — resumes where you left off; exiting playback drops you right back on it
 - **Title details** — poster, year, runtime, IMDb rating, genres, description, cast, director
 - **Series support** — seasons → episodes with air dates → stream picker
-- **Search** (press Y) via the on-screen keyboard
-- **Favourites** (press X on any poster) and **Continue Watching** with resume
+- **Search** — press Y anywhere on home, or use the search button in the top bar
 - **Custom player controls** tuned for streaming (seek on shoulders, lock screen, stream info)
 - Streams play as direct HTTPS URLs through MPV — nothing torrent-related runs on the Switch
 
@@ -97,18 +99,21 @@ the player — pick one under **+ → Subtitle** (one per language, alongside an
 
 | Context | Button | Action |
 |---|---|---|
-| Home | Y | Search |
-| Home | X | Add/remove favourite |
+| Home | Y | Search (also: top-bar search button) |
+| Home | X | Add/remove from Library |
 | Home | − | Set stream addon URL |
+| Library | Y | Search within the library |
 | Detail page | A on ▶ | Watch (movies) / Episodes (series) |
+| Detail page | X | Add/remove from Library |
 | Player | L / R | Seek back / forward |
 | Player | X | Lock screen |
 | Player | − | Stream info |
 | Player | + | Settings |
 
-## Building
+## Building from source
 
-Requires [devkitPro](https://devkitpro.org/) with devkitA64/libnx and Switchfin's custom
+Prebuilt releases are made by [GitHub Actions](.github/workflows/build-switch.yaml). To build
+locally you need [devkitPro](https://devkitpro.org/) with devkitA64/libnx and Switchfin's custom
 [switch-portlibs](https://github.com/dragonflylee/switchfin/releases/tag/switch-portlibs)
 (mbedtls, libssh2, dav1d, curl, ffmpeg, libmpv, libjpeg-turbo).
 

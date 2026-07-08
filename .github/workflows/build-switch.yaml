@@ -3,6 +3,9 @@ name: Build Switch NRO
 on:
   push:
     branches: [main, "claude/**"]
+    paths-ignore:
+    - README.md
+    - images/**
   workflow_dispatch:
 
 permissions:
