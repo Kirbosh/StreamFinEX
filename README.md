@@ -8,7 +8,9 @@ A **streaming-only Stremio client for homebrewed Nintendo Switch**. This is a fo
 [StreamFin](https://github.com/scamNscoot/StreamFin) (itself built on
 [Switchfin](https://github.com/dragonflylee/switchfin), with the Jellyfin data layer replaced by
 the [Stremio addon protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md)),
-focused on making the experience look and feel like **actual Stremio**.
+reworked to look and feel like **actual Stremio**: a dark ocean-blue/purple theme, glowing
+focus, a fully customizable home screen, a Library, anime support, and smooth controller
+navigation.
 
 Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a stream, and play —
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
@@ -22,31 +24,58 @@ on your SD card. Every push to this repo builds a fresh release automatically.
 
 ## Screenshots
 
-| Home (ocean theme) | Title details |
+| Home — genre carousels | Title details |
 |---|---|
-| ![Home screen](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
+| ![Home carousels](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
 
-| Episodes | Playback |
+| Episodes | Your Library |
 |---|---|
-| ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-play.jpg) |
+| ![Episode list](images/capture-episodes.jpg) | ![Library grid](images/capture-library.jpg) |
+
+| Customize your rows | Playback |
+|---|---|
+| ![Row editor](images/capture-rows.jpg) | ![Player](images/capture-play.jpg) |
 
 ## Features
 
-- **Stremio-style look** — dark ocean-navy gradient theme with purple accents, official Stremio
-  icon, and a glowing focus outline that breathes between ocean blue and purple
-- **32 home rows** — Popular / New / Top Rated / genre rows for movies & series (Cinemeta),
-  a **Surprise Me** row with random picks each launch, and **Anime** via the Kitsu addon,
-  with **IMDb rating badges** on every poster
-- **Smart navigation** — moving between rows lands on the poster directly above/below you;
-  rows scroll poster-by-poster with a sliver of the next/previous poster at each edge
-- **Library** — save any title with X (dot badge); the home row shows your newest saves plus a
-  See-all card opening a full grid with **search and sort** (recent / name / year / rating)
-- **Continue Watching** — resumes where you left off; exiting playback drops you right back on it
-- **Title details** — poster, year, runtime, IMDb rating, genres, description, cast, director
-- **Series support** — seasons → episodes with air dates → stream picker
-- **Search** — press Y anywhere on home, or use the search button in the top bar
-- **Custom player controls** tuned for streaming (seek on shoulders, lock screen, stream info)
-- Streams play as direct HTTPS URLs through MPV — nothing torrent-related runs on the Switch
+### Look & feel
+- **Stremio-style theme** — dark ocean-navy gradient background with purple accents and the
+  official Stremio play-diamond icon
+- **Glowing focus** — the selected poster has a soft outline that gently breathes between ocean
+  blue and Stremio purple, with the pill-shaped Watch/Episodes button matching the same glow
+- **Edge-to-edge carousels** — rows run the full width of the screen and show a sliver of the
+  next/previous poster at each edge, so it's always clear there's more to scroll
+
+### Browse
+- **Customizable home rows** — press the **Stremio logo** (top-left) to open the row editor:
+  every catalog is listed (Popular / New / Top Rated plus **all 21 Cinemeta genres** for both
+  movies *and* series, plus Anime — 49 rows in total). **A** turns a row on/off, **Y**/**X**
+  move it up/down, **B** saves. Your layout persists across launches, and fewer rows means a
+  lighter, faster home screen
+- **Anime** — a dedicated row (both anime movies and series) powered by the
+  [Anime Kitsu](https://anime-kitsu.strem.fun) addon, with a **More** card that opens a full
+  anime browse grid and its own anime-only search (keeps anime out of the main search)
+- **IMDb rating badges** on every poster, straight from the catalog data
+- **Search** — press **Y** anywhere on home or use the search button in the top bar; movie and
+  series results are interleaved so nothing gets buried
+
+### Library
+- Save any title with **X** — a small dot badge marks saved posters
+- The home **Library** row shows your most recent saves plus a **See all** card that opens a
+  full grid with **search** and **sort** (recent / name / year / rating)
+
+### Watch
+- **Continue Watching** — resumes exactly where you left off; when you stop playback you're
+  dropped straight back onto the Continue Watching row
+- **Title details** — poster, year, runtime, ★ rating, genres, description (with a **See more**
+  that opens a fully scrollable synopsis), cast and director
+- **Series & anime** — seasons → episodes with thumbnails, titles, air dates and per-episode
+  descriptions → stream picker
+- **Robust streams** — anime (Kitsu) ids are looked up across the `series` / `anime` / `movie`
+  types until your addon answers, so titles that used to fail with an HTTP error now play
+- **Custom player controls** tuned for streaming (seek on the shoulder buttons, lock screen,
+  stream info). Streams play as direct HTTPS URLs through MPV — nothing torrent-related runs
+  on the Switch itself
 
 ## Setup
 
@@ -99,11 +128,15 @@ the player — pick one under **+ → Subtitle** (one per language, alongside an
 
 | Context | Button | Action |
 |---|---|---|
+| Home | Stremio logo (A) | Customize home rows |
 | Home | Y | Search (also: top-bar search button) |
 | Home | X | Add/remove from Library |
 | Home | − | Set stream addon URL |
+| Row editor | A / Y / X / B | Toggle row · move up · move down · save |
 | Library | Y | Search within the library |
-| Detail page | A on ▶ | Watch (movies) / Episodes (series) |
+| Library | Sort button | Cycle recent / name / year / rating |
+| Detail page | A on ▶ | Watch (movies) / Episodes (series & anime) |
+| Detail page | See more | Open the full scrollable description |
 | Detail page | X | Add/remove from Library |
 | Player | L / R | Seek back / forward |
 | Player | X | Lock screen |
@@ -131,6 +164,7 @@ ninja -C build_switch StreamFin.nro
 - [Switchfin](https://github.com/dragonflylee/switchfin) by dragonflylee — the original app
   (player, UI framework integration, build system)
 - [borealis](https://github.com/natinusala/borealis) — Switch-style UI library
+- [Anime Kitsu](https://anime-kitsu.strem.fun) — anime catalog & metadata addon
 - [Stremio](https://www.stremio.com/) — the addon protocol, the public Cinemeta catalog, and the
   logo used for the app icon
 
