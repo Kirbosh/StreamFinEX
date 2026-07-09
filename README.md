@@ -16,6 +16,8 @@ Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a str
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
 addon URL**, which the app asks for on first launch.
 
+This doesn't work with torrents, only HTTPS,pst debrid services csn provide https streams.
+
 ## Download
 
 Grab the latest `StreamFin.nro` from the
