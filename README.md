@@ -16,6 +16,8 @@ Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a str
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
 addon URL**, which the app asks for on first launch.
 
+This doesn't work with torrents, only HTTPS — most debrid services can provide HTTPS streams.
+
 ## Download
 
 Grab the latest `StreamFin.nro` from the
@@ -24,17 +26,17 @@ on your SD card. Every push to this repo builds a fresh release automatically.
 
 ## Screenshots
 
-| Home — genre carousels | Title details |
-|---|---|
-| ![Home carousels](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
+<p align="center">
+  <img src="images/capture-detail.jpg" alt="Title details" width="800" />
+</p>
 
-| Episodes | Your Library |
+| Home — genre carousels | Your Library |
 |---|---|
-| ![Episode list](images/capture-episodes.jpg) | ![Library grid](images/capture-library.jpg) |
+| ![Home carousels](images/capture-home.jpg) | ![Library grid](images/capture-library.jpg) |
 
-| Customize your rows | Playback |
+| Episodes | Customize your rows |
 |---|---|
-| ![Row editor](images/capture-rows.jpg) | ![Player](images/capture-play.jpg) |
+| ![Episode list](images/capture-episodes.jpg) | ![Row editor](images/capture-rows.jpg) |
 
 ## Features
 
